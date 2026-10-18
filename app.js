@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
-  let config = JSON.parse(localStorage.getItem('lifeTrackerConfig')) || null;
-  let flow = []; // 画面（セクション）の並び順を管理する配列
+  // ★修正: データが空(null)の場合でもクラッシュしないよう初期構造を持たせる
+  let config = JSON.parse(localStorage.getItem('lifeTrackerConfig')) || { birth: '', lifeAge: 30, customs: [] };
+  let flow = []; 
   let currentIndex = 0;
   let animationFrameId = null;
 
@@ -17,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- 初期化 ---
   function init() {
     injectSVGDefs();
-    if (!config || !config.birth) {
+    if (!config.birth) {
       setupOverlay.style.display = 'flex';
       initDatePicker('picker-birth', null);
     } else {
@@ -49,13 +50,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- 画面構築（カルーセルロジック） ---
   function buildDOMFlow() {
-    // 既存のDOMを取得
     const viewLife = document.getElementById('view-life');
     const viewBorn = document.getElementById('view-born');
     const viewSettings = document.getElementById('view-settings');
     const viewCustomEmpty = document.getElementById('view-custom-empty');
     
-    // 現在のカスタムビューを削除
     document.querySelectorAll('.custom-dynamic-view').forEach(el => el.remove());
 
     flow = [];
@@ -65,13 +64,16 @@ document.addEventListener('DOMContentLoaded', () => {
     swipeWrapper.appendChild(viewBorn);
     flow.push({ id: 'view-born', tab: 'view-born' });
 
-    if (!config.customs || config.customs.length === 0) {
+    // ★ null チェックを強化
+    const customs = config.customs || [];
+
+    if (customs.length === 0) {
       swipeWrapper.appendChild(viewCustomEmpty);
       viewCustomEmpty.style.display = 'flex';
       flow.push({ id: 'view-custom-empty', tab: 'view-custom' });
     } else {
       viewCustomEmpty.style.display = 'none';
-      config.customs.forEach((c, i) => {
+      customs.forEach((c, i) => {
         const customId = `view-custom-${i}`;
         const section = document.createElement('section');
         section.className = 'view-section custom-dynamic-view';
@@ -96,16 +98,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if(currentIndex < 0) currentIndex = 0;
     if(currentIndex >= flow.length) currentIndex = flow.length - 1;
     
-    // カメラ（表示枠）の移動
     swipeWrapper.style.transform = `translateX(-${currentIndex * 100}vw)`;
     
-    // タブの更新
     const activeTabTarget = flow[currentIndex].tab;
     tabs.forEach(t => {
       t.classList.toggle('active', t.getAttribute('data-tab') === activeTabTarget);
     });
 
-    // カスタムインジケーターの表示制御
     const indContainer = document.getElementById('custom-indicators');
     if (activeTabTarget === 'view-custom' && config.customs && config.customs.length > 1) {
       indContainer.classList.add('show');
@@ -120,7 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateIndicators() {
     const indContainer = document.getElementById('custom-indicators');
     indContainer.innerHTML = '';
-    if (config && config.customs && config.customs.length > 1) {
+    if (config.customs && config.customs.length > 1) {
       config.customs.forEach(() => {
         let dot = document.createElement('div');
         dot.className = 'indicator-dot';
@@ -145,12 +144,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let dx = touchEndX - touchStartX;
     let dy = touchEndY - touchStartY;
     
-    // 横移動が縦移動より大きく、かつ50px以上動いた場合のみ遷移
     if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
       if (dx < 0 && currentIndex < flow.length - 1) {
-        currentIndex++; // 左スワイプ（次へ）
+        currentIndex++; 
       } else if (dx > 0 && currentIndex > 0) {
-        currentIndex--; // 右スワイプ（前へ）
+        currentIndex--; 
       }
       updateCarousel();
     }
@@ -167,7 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // --- 時間計算ロジック (NaN撲滅と「-」表記) ---
+  // --- 時間計算ロジック ---
   function calculateDiff(startStr, endStr, isCountdown) {
     if (!startStr || !endStr) return { years: '-', days: '-', hours: '-', minutes: '-', seconds: '-', progress: 0 };
     
@@ -204,22 +202,19 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function calculateLife(now) {
-    if(!config || !config.birth) return calculateDiff(null, null, true);
+    if(!config.birth) return calculateDiff(null, null, true);
     const birth = new Date(config.birth);
     const end = new Date(birth);
-    end.setFullYear(birth.getFullYear() + Number(config.lifeAge));
+    end.setFullYear(birth.getFullYear() + Number(config.lifeAge || 30));
     return calculateDiff(now, end, true);
   }
 
-  // --- 描画ループ ---
   function startRenderLoop() {
     if(animationFrameId) cancelAnimationFrame(animationFrameId);
     
     function render() {
       const now = new Date();
-      const current = flow[currentIndex];
       
-      // 現在表示されている画面と、その両隣の画面だけを計算・描画して負荷を下げる
       [currentIndex - 1, currentIndex, currentIndex + 1].forEach(idx => {
         if(idx >= 0 && idx < flow.length) {
           const view = flow[idx];
@@ -244,201 +239,4 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="circle-wrapper">
           <svg class="circle-svg" viewBox="0 0 100 100">
             <circle class="circle-bg" cx="50" cy="50" r="45"></circle>
-            <circle class="circle-progress" cx="50" cy="50" r="45" stroke="url(#grad-${colorType})"></circle>
-          </svg>
-          <div class="circle-content">
-            <div class="circle-value" id="${containerId}-years">-</div>
-            <div class="circle-unit">年</div>
-          </div>
-        </div>
-        <div class="sub-timer-grid">
-          <div class="sub-timer-item"><span class="sub-value" id="${containerId}-days">-</span><span class="sub-unit">日</span></div>
-          <div class="sub-timer-item"><span class="sub-value" id="${containerId}-hours">-</span><span class="sub-unit">時間</span></div>
-          <div class="sub-timer-item"><span class="sub-value" id="${containerId}-mins">-</span><span class="sub-unit">分</span></div>
-          <div class="sub-timer-item"><span class="sub-value" id="${containerId}-secs">-</span><span class="sub-unit">秒</span></div>
-        </div>
-      `;
-    }
-    
-    document.getElementById(`${containerId}-years`).textContent = data.years;
-    document.getElementById(`${containerId}-days`).textContent = data.days;
-    document.getElementById(`${containerId}-hours`).textContent = data.hours !== '-' ? String(data.hours).padStart(2, '0') : '-';
-    document.getElementById(`${containerId}-mins`).textContent = data.minutes !== '-' ? String(data.minutes).padStart(2, '0') : '-';
-    document.getElementById(`${containerId}-secs`).textContent = data.seconds !== '-' ? String(data.seconds).padStart(2, '0') : '-';
-
-    const circle = container.querySelector('.circle-progress');
-    const radius = 45; const circumference = 2 * Math.PI * radius;
-    circle.style.strokeDasharray = circumference;
-    circle.style.strokeDashoffset = data.years === '-' ? circumference : circumference - (data.progress * circumference);
-  }
-
-  // --- Apple風 年月日ピッカーの生成 ---
-  function initDatePicker(containerId, initialDateStr) {
-    const container = document.getElementById(containerId);
-    if(!container) return;
-    
-    let initY = '', initM = '', initD = '';
-    if (initialDateStr) {
-      const d = new Date(initialDateStr);
-      if(!isNaN(d.getTime())){ initY = d.getFullYear(); initM = d.getMonth() + 1; initD = d.getDate(); }
-    }
-
-    const currentYear = new Date().getFullYear();
-    
-    let html = `
-      <div class="apple-select-wrap"><select class="apple-select" id="${containerId}-y"><option value="">--</option>`;
-    for(let y = currentYear; y >= currentYear - 100; y--) {
-      html += `<option value="${y}" ${y === initY ? 'selected' : ''}>${y}</option>`;
-    }
-    html += `</select><span class="unit-label">年</span></div>
-      <div class="apple-select-wrap"><select class="apple-select" id="${containerId}-m"><option value="">--</option>`;
-    for(let m = 1; m <= 12; m++) {
-      html += `<option value="${m}" ${m === initM ? 'selected' : ''}>${m}</option>`;
-    }
-    html += `</select><span class="unit-label">月</span></div>
-      <div class="apple-select-wrap"><select class="apple-select" id="${containerId}-d"><option value="">--</option>`;
-    for(let d = 1; d <= 31; d++) {
-      html += `<option value="${d}" ${d === initD ? 'selected' : ''}>${d}</option>`;
-    }
-    html += `</select><span class="unit-label">日</span></div>`;
-    
-    container.innerHTML = html;
-
-    // 月ごとの日数調整（2月など）
-    const ySel = document.getElementById(`${containerId}-y`);
-    const mSel = document.getElementById(`${containerId}-m`);
-    const dSel = document.getElementById(`${containerId}-d`);
-    
-    function adjustDays() {
-      const y = parseInt(ySel.value), m = parseInt(mSel.value);
-      if(!y || !m) return;
-      const daysInMonth = new Date(y, m, 0).getDate();
-      const currentDay = parseInt(dSel.value);
-      let dHtml = `<option value="">--</option>`;
-      for(let d = 1; d <= daysInMonth; d++) {
-        dHtml += `<option value="${d}" ${d === currentDay ? 'selected' : ''}>${d}</option>`;
-      }
-      dSel.innerHTML = dHtml;
-      
-      // バリデーションエラー枠を外す
-      document.getElementById(containerId).classList.remove('has-error');
-    }
-    ySel.addEventListener('change', adjustDays);
-    mSel.addEventListener('change', adjustDays);
-    dSel.addEventListener('change', () => document.getElementById(containerId).classList.remove('has-error'));
-  }
-
-  // ピッカーから値を取得する関数
-  function getPickerDate(containerId) {
-    const y = document.getElementById(`${containerId}-y`).value;
-    const m = document.getElementById(`${containerId}-m`).value;
-    const d = document.getElementById(`${containerId}-d`).value;
-    if(!y || !m || !d) return null;
-    return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-  }
-
-  // --- 設定画面の制御 ---
-  document.getElementById('btn-start-setup').addEventListener('click', () => {
-    setupOverlay.style.display = 'none';
-    buildDOMFlow();
-    currentIndex = flow.findIndex(f => f.tab === 'view-settings');
-    updateCarousel();
-  });
-
-  function populateSettings() {
-    initDatePicker('picker-birth', config.birth);
-    document.getElementById('input-life').value = config.lifeAge || 30;
-    renderCustomSettings();
-  }
-
-  function renderCustomSettings() {
-    const list = document.getElementById('custom-settings-list');
-    list.innerHTML = '';
-    const customs = config?.customs || [];
-    customs.forEach((c, index) => {
-      const pId = `picker-custom-${index}`;
-      const card = document.createElement('div');
-      card.className = 'custom-item-card';
-      card.innerHTML = `
-        <div class="custom-item-header">
-          <input type="text" class="input-field" placeholder="タイトル (例: 禁煙)" value="${c.title}" id="custom-title-${index}" style="margin-right: 12px;">
-          <button class="btn-icon-danger" onclick="removeCustom(${index})" title="削除">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-          </button>
-        </div>
-        <div class="date-picker-group" id="${pId}"></div>
-        <div class="error-msg" id="error-custom-${index}">未来の日付は選択できません</div>
-      `;
-      list.appendChild(card);
-      initDatePicker(pId, c.start);
-    });
-    document.getElementById('btn-add-custom').style.display = customs.length >= 3 ? 'none' : 'block';
-  }
-
-  document.getElementById('btn-add-custom').addEventListener('click', () => {
-    if(!config) config = { customs: [] };
-    if(!config.customs) config.customs = [];
-    if(config.customs.length < 3) {
-      config.customs.push({ title: '', start: null });
-      renderCustomSettings();
-    }
-  });
-
-  window.removeCustom = function(index) {
-    config.customs.splice(index, 1);
-    renderCustomSettings();
-  };
-
-  // 未来日チェック
-  function isFutureDate(dateStr) {
-    if(!dateStr) return false;
-    const selected = new Date(dateStr);
-    const now = new Date();
-    now.setHours(23, 59, 59, 999);
-    return selected > now;
-  }
-
-  document.getElementById('btn-save-settings').addEventListener('click', () => {
-    let hasError = false;
-    
-    // 生まれた日付のバリデーション
-    const birthStr = getPickerDate('picker-birth');
-    if(birthStr && isFutureDate(birthStr)) {
-      document.getElementById('picker-birth').classList.add('has-error');
-      hasError = true;
-    }
-    if(!birthStr) { alert('生まれた日付を選択してください。'); return; }
-
-    const lifeAge = document.getElementById('input-life').value;
-    if(!lifeAge) { alert('寿命を設定してください。'); return; }
-
-    // カスタム設定のバリデーション
-    const newCustoms = [];
-    const customsCount = config?.customs?.length || 0;
-    for(let i=0; i<customsCount; i++) {
-      const tInput = document.getElementById(`custom-title-${i}`);
-      const tVal = tInput ? tInput.value : '';
-      const cStr = getPickerDate(`picker-custom-${i}`);
-      
-      if(cStr && isFutureDate(cStr)) {
-        document.getElementById(`picker-custom-${i}`).classList.add('has-error');
-        hasError = true;
-      } else if (cStr) {
-        newCustoms.push({ title: tVal, start: cStr });
-      }
-    }
-
-    if (hasError) return; // エラーがあれば保存中断
-
-    config = { birth: birthStr, lifeAge: lifeAge, customs: newCustoms };
-    localStorage.setItem('lifeTrackerConfig', JSON.stringify(config));
-    
-    // 構造を再構築して、Life画面（インデックス0）へ美しくスライド
-    buildDOMFlow();
-    currentIndex = 0;
-    updateCarousel();
-    startRenderLoop();
-  });
-
-  init();
-});
+            <circle class="circle-progress" cx="50" cy="50" r="45" stroke="url(#grad-${colorType})"></circle
