@@ -1,0 +1,222 @@
+:root {
+  --bg-color: #09090b;
+  --surface-color: #18181b;
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --border-color: #27272a;
+  
+  /* セマンティックカラー */
+  --color-life: url(#grad-life);
+  --color-born: url(#grad-born);
+  --color-custom: url(#grad-custom);
+  
+  --nav-height: 80px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+.app-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- タイマーUI設計 (視覚的階層) --- */
+.view-section {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  height: calc(100vh - var(--nav-height) - 40px);
+  padding: 60px 20px 20px;
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.view-section.active { display: flex; }
+.view-section.scrollable { overflow-y: auto; align-items: stretch; }
+
+.view-title {
+  font-size: 1.2rem;
+  font-weight: 300;
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+  margin-bottom: 40px;
+}
+
+/* サークル領域 */
+.circle-wrapper {
+  position: relative;
+  width: 280px;
+  height: 280px;
+  margin-bottom: 40px;
+}
+.circle-svg {
+  transform: rotate(-90deg);
+  width: 100%;
+  height: 100%;
+}
+.circle-bg {
+  fill: none;
+  stroke: var(--surface-color);
+  stroke-width: 6;
+}
+.circle-progress {
+  fill: none;
+  stroke-width: 6;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1s ease-out;
+}
+.circle-content {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+.circle-value {
+  font-size: 5.5rem;
+  font-weight: 200;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.circle-unit {
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+/* 下部の日・時・分・秒 */
+.sub-timer-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  width: 100%;
+  max-width: 320px;
+}
+.sub-timer-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.sub-value {
+  font-size: 2rem;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+}
+.sub-unit {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+/* --- フローティングタブバー (Liquid Glassデザイン) --- */
+.floating-tab-bar {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 40px);
+  max-width: 400px;
+  height: 64px;
+  background: rgba(24, 24, 27, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 32px;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 100;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+.tab-item {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 60px;
+  height: 100%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.tab-item svg { width: 22px; height: 22px; stroke-width: 1.5; }
+.tab-item span { font-size: 0.65rem; font-weight: 500; }
+.tab-item.active { color: var(--text-primary); }
+.tab-item.active svg { stroke-width: 2.2; }
+
+/* --- 設定画面・フォーム --- */
+.settings-form { max-width: 400px; margin: 0 auto; width: 100%; padding-bottom: 100px; }
+.form-group { margin-bottom: 24px; }
+.form-group label, .form-header-row label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+.input-field {
+  width: 100%;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 16px;
+  border-radius: 16px;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.2s;
+  font-family: 'Inter', sans-serif;
+}
+.input-field:focus { border-color: #fafafa; }
+.input-suffix-wrap { position: relative; display: flex; align-items: center; }
+.suffix { position: absolute; right: 16px; color: var(--text-secondary); }
+.divider { border: none; border-top: 1px solid var(--border-color); margin: 32px 0; }
+.form-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+
+/* ボタン類 */
+.btn-primary {
+  width: 100%; background: var(--text-primary); color: var(--bg-color);
+  border: none; padding: 18px; border-radius: 16px; font-size: 1rem;
+  font-weight: 600; cursor: pointer; transition: transform 0.1s;
+}
+.btn-primary:active { transform: scale(0.97); }
+.btn-text { background: none; border: none; color: #0A84FF; font-size: 0.9rem; cursor: pointer; }
+.btn-remove { background: none; border: none; color: #FF453A; font-size: 0.8rem; cursor: pointer; margin-top: 8px; }
+
+/* カスタムアイテム */
+.custom-item-card {
+  background: var(--surface-color); padding: 16px;
+  border-radius: 16px; margin-bottom: 12px; border: 1px solid var(--border-color);
+}
+.custom-indicators { display: flex; gap: 8px; justify-content: center; margin-bottom: 20px;}
+.indicator-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border-color); transition: 0.3s;}
+.indicator-dot.active { background: var(--text-primary); }
+.custom-swipe-area { width: 100%; overflow: hidden; touch-action: pan-y; }
+
+/* オーバーレイ */
+.setup-overlay {
+  position: fixed; inset: 0; background: var(--bg-color); z-index: 999;
+  display: flex; align-items: center; justify-content: center;
+}
+.setup-card { text-align: center; padding: 32px; }
+.setup-card h2 { font-size: 2rem; font-weight: 300; margin-bottom: 12px; }
+.setup-card p { color: var(--text-secondary); margin-bottom: 32px; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
