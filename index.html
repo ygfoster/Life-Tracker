@@ -4,91 +4,100 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Life Tracker</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="app-container">
-    
-    <!-- 初回設定オーバーレイ (Empty State) -->
-    <div id="setup-overlay" class="setup-overlay">
-      <div class="setup-card">
-        <h2>Welcome</h2>
-        <p>あなたの時間を刻み始めましょう。</p>
-        <button id="btn-start-setup" class="btn-primary">設定をはじめる</button>
-      </div>
+  <!-- 初回設定オーバーレイ -->
+  <div id="setup-overlay" class="setup-overlay">
+    <div class="setup-card">
+      <h2>Welcome</h2>
+      <p>あなたの時間を刻み始めましょう。</p>
+      <button id="btn-start-setup" class="btn-primary">設定をはじめる</button>
     </div>
+  </div>
 
-    <!-- メインコンテンツ領域 -->
-    <main id="main-content">
-      
-      <!-- 寿命画面 (Life) -->
-      <section id="view-life" class="view-section active">
-        <h1 class="view-title">私の余命</h1>
-        <div class="timer-display" id="timer-life"></div>
-      </section>
+  <div class="app-container">
+    <!-- ★追加：すべての画面を横並びにするスワイプコンテナ -->
+    <main id="main-content" class="viewport">
+      <div id="swipe-wrapper" class="swipe-wrapper">
+        
+        <!-- 生存画面 (Life) -->
+        <section id="view-life" class="view-section">
+          <h1 class="view-title">私の寿命</h1>
+          <div class="timer-display" id="timer-life"></div>
+        </section>
 
-      <!-- 生誕画面 (Born) -->
-      <section id="view-born" class="view-section">
-        <h1 class="view-title">生まれてからの時間</h1>
-        <div class="timer-display" id="timer-born"></div>
-      </section>
+        <!-- 生誕画面 (Born) -->
+        <section id="view-born" class="view-section">
+          <h1 class="view-title">私が生まれてから</h1>
+          <div class="timer-display" id="timer-born"></div>
+        </section>
 
-      <!-- カスタム画面 (Custom) -->
-      <section id="view-custom" class="view-section">
-        <div class="custom-header">
-          <h1 class="view-title" id="custom-title">カスタムタイマー</h1>
-          <div class="custom-indicators" id="custom-indicators"></div>
-        </div>
-        <div class="custom-swipe-area" id="custom-swipe-area">
-          <div class="timer-display" id="timer-custom"></div>
-        </div>
-      </section>
+        <!-- カスタム画面のテンプレ（JSで動的に挿入されます） -->
+        <div id="custom-views-anchor" style="display: none;"></div>
 
-      <!-- 設定画面 (Settings) -->
-      <section id="view-settings" class="view-section scrollable">
-        <h1 class="view-title">Settings</h1>
-        <div class="settings-form">
-          <div class="form-group">
-            <label>生年月日</label>
-            <input type="date" id="input-birth" class="input-field">
+        <!-- 空のカスタム画面 (設定がない時用) -->
+        <section id="view-custom-empty" class="view-section">
+          <h1 class="view-title">未設定</h1>
+          <div class="empty-custom-msg">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+            <p>設定画面から<br>カスタムタイマーを追加してください</p>
           </div>
-          <div class="form-group">
-            <label>寿命の目標設定 (年齢)</label>
-            <div class="input-suffix-wrap">
-              <input type="number" id="input-life" class="input-field" placeholder="例: 30" min="1" max="150">
-              <span class="suffix">歳まで</span>
+        </section>
+
+        <!-- 設定画面 (Settings) -->
+        <section id="view-settings" class="view-section scrollable">
+          <h1 class="view-title">Settings</h1>
+          <div class="settings-form">
+            
+            <div class="form-group">
+              <label>生まれた日付</label>
+              <!-- ★追加：Apple風の年月日ピッカー -->
+              <div class="date-picker-group" id="picker-birth"></div>
+              <div class="error-msg" id="error-birth">未来の日付は選択できません</div>
             </div>
-          </div>
-          
-          <hr class="divider">
-          <div class="form-header-row">
-            <label>カスタム設定 (最大3件)</label>
-            <button id="btn-add-custom" class="btn-text">+ 追加</button>
-          </div>
-          <div id="custom-settings-list" class="custom-settings-list"></div>
-          
-          <button id="btn-save-settings" class="btn-primary" style="margin-top: 32px;">保存して反映</button>
-        </div>
-      </section>
 
+            <div class="form-group">
+              <label>寿命</label>
+              <div class="input-suffix-wrap">
+                <input type="number" id="input-life" class="input-field" placeholder="例: 30" min="1" max="150" inputmode="numeric">
+                <span class="suffix">歳まで</span>
+              </div>
+            </div>
+            
+            <hr class="divider">
+            <div class="form-header-row">
+              <label>カスタム設定 (最大3件)</label>
+              <button id="btn-add-custom" class="btn-text">+ 追加</button>
+            </div>
+            <div id="custom-settings-list" class="custom-settings-list"></div>
+            
+            <button id="btn-save-settings" class="btn-primary" style="margin-top: 32px;">保存して反映</button>
+          </div>
+        </section>
+
+      </div>
     </main>
+
+    <!-- インジケーター (カスタム画面用) -->
+    <div class="custom-indicators" id="custom-indicators"></div>
 
     <!-- フローティングタブバー -->
     <nav class="floating-tab-bar" id="bottom-nav">
-      <button class="tab-item active" data-target="view-life">
+      <button class="tab-item active" data-tab="view-life">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
         <span>Life</span>
       </button>
-      <button class="tab-item" data-target="view-born">
+      <button class="tab-item" data-tab="view-born">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         <span>Born</span>
       </button>
-      <button class="tab-item" data-target="view-custom">
+      <button class="tab-item" data-tab="view-custom">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
         <span>Custom</span>
       </button>
-      <button class="tab-item" data-target="view-settings">
+      <button class="tab-item" data-tab="view-settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         <span>Setting</span>
       </button>
