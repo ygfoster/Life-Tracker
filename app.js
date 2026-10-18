@@ -1,11 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   let config = JSON.parse(localStorage.getItem('lifeTrackerConfig'));
-  if (!config) {
-    config = { birth: '', lifeAge: 30, customs: [] };
-  }
-  if (!config.customs) {
-    config.customs = [];
-  }
+  if (!config) config = { birth: '', lifeAge: 30, customs: [] };
+  if (!config.customs) config.customs = [];
 
   let flow = []; 
   let currentIndex = 0;
@@ -25,18 +21,18 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- 初期化 ---
   function init() {
     injectSVGDefs();
+    injectSavingOverlay(); // 保存時オーバーレイのDOM追加
+    
     if (!config.birth) {
-      // 未設定ならオーバーレイ表示
       setupOverlay.style.display = 'flex';
       initDatePicker('picker-birth', null);
+      initLifeStepper();
     } else {
-      // 設定済みなら即座にメインUIを描画
       setupOverlay.style.display = 'none';
       startMainUI();
     }
   }
 
-  // --- メインUIの起動 ---
   function startMainUI() {
     buildDOMFlow();
     populateSettings();
@@ -45,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function injectSVGDefs() {
-    if(document.getElementById('svg-defs-container')) return; // 二重生成防止
+    if(document.getElementById('svg-defs-container')) return;
     const svgNS = "http://www.w3.org/2000/svg";
     const svg = document.createElementNS(svgNS, "svg");
     svg.id = 'svg-defs-container';
@@ -63,6 +59,24 @@ document.addEventListener('DOMContentLoaded', () => {
       grad.appendChild(stop1); grad.appendChild(stop2); defs.appendChild(grad);
     });
     svg.appendChild(defs); document.body.appendChild(svg);
+  }
+
+  // 保存時オーバーレイの生成
+  function injectSavingOverlay() {
+    if(document.getElementById('saving-overlay')) return;
+    const overlay = document.createElement('div');
+    overlay.id = 'saving-overlay';
+    overlay.className = 'saving-overlay';
+    overlay.innerHTML = `
+      <div class="saving-spinner" id="saving-spinner"></div>
+      <div class="saving-check" id="saving-check">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </div>
+      <div class="saving-text" id="saving-text">Saving...</div>
+    `;
+    document.body.appendChild(overlay);
   }
 
   // --- 画面構築 ---
@@ -102,7 +116,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if(viewSettings) { swipeWrapper.appendChild(viewSettings); flow.push({ id: 'view-settings', tab: 'view-settings' }); }
-
     updateIndicators();
   }
 
@@ -144,10 +157,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // --- スワイプとタブ制御 ---
   let touchStartX = 0, touchStartY = 0;
   const mainContent = document.getElementById('main-content');
-  
   if(mainContent) {
     mainContent.addEventListener('touchstart', e => {
       if (e.target.closest('select') || e.target.closest('input') || e.target.closest('button')) return;
@@ -237,7 +248,6 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderTimer(containerId, data, colorType) {
     const container = document.getElementById(containerId);
     if(!container) return;
-    
     if (!container.innerHTML) {
       container.innerHTML = `
         <div class="circle-wrapper">
@@ -257,14 +267,13 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById(`${containerId}-hours`).textContent = data.hours !== '-' ? String(data.hours).padStart(2, '0') : '-';
     document.getElementById(`${containerId}-mins`).textContent = data.minutes !== '-' ? String(data.minutes).padStart(2, '0') : '-';
     document.getElementById(`${containerId}-secs`).textContent = data.seconds !== '-' ? String(data.seconds).padStart(2, '0') : '-';
-
     const circle = container.querySelector('.circle-progress');
     const circumference = 2 * Math.PI * 45;
     circle.style.strokeDasharray = circumference;
     circle.style.strokeDashoffset = data.years === '-' ? circumference : circumference - (data.progress * circumference);
   }
 
-  // --- 設定画面コンポーネント ---
+  // --- UIコンポーネント ---
   function initDatePicker(containerId, initialDateStr) {
     const container = document.getElementById(containerId);
     if(!container) return;
@@ -310,9 +319,34 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
   }
 
+  // ★ 寿命用カスタムステッパー生成
+  function initLifeStepper() {
+    const wrap = document.getElementById('input-life-wrap');
+    if(!wrap) return;
+    
+    wrap.innerHTML = `
+      <div class="stepper-wrapper" id="life-stepper-container">
+        <input type="number" id="input-life" class="stepper-input" value="${config.lifeAge || 30}" min="1" max="150" readonly>
+        <span class="stepper-suffix">歳まで</span>
+        <button type="button" class="stepper-btn" id="btn-life-minus">－</button>
+        <button type="button" class="stepper-btn" id="btn-life-plus">＋</button>
+      </div>
+    `;
+
+    const inputLife = document.getElementById('input-life');
+    document.getElementById('btn-life-minus').addEventListener('click', () => {
+      let val = parseInt(inputLife.value) || 30;
+      if(val > 1) inputLife.value = val - 1;
+    });
+    document.getElementById('btn-life-plus').addEventListener('click', () => {
+      let val = parseInt(inputLife.value) || 30;
+      if(val < 150) inputLife.value = val + 1;
+    });
+  }
+
   function populateSettings() {
     initDatePicker('picker-birth', config.birth);
-    if(document.getElementById('input-life')) document.getElementById('input-life').value = config.lifeAge || 30;
+    initLifeStepper();
     renderCustomSettings();
   }
 
@@ -365,24 +399,22 @@ document.addEventListener('DOMContentLoaded', () => {
     return selected > now;
   }
 
-  // ★ 堅牢なイベントリスナー（設定をはじめるボタン）
+  // --- 保存処理とトランジション ---
   if (btnStartSetup) {
     btnStartSetup.addEventListener('click', () => {
       setupOverlay.style.opacity = '0';
       setTimeout(() => {
         setupOverlay.style.display = 'none';
         startMainUI();
-        
         const targetIndex = flow.findIndex(f => f.tab === 'view-settings');
         if(targetIndex !== -1) {
           currentIndex = targetIndex;
           updateCarousel();
         }
-      }, 300); // フェードアウトアニメーション待ち
+      }, 300);
     });
   }
 
-  // ★ 堅牢なイベントリスナー（保存して反映ボタン）
   const btnSaveSettings = document.getElementById('btn-save-settings');
   if (btnSaveSettings) {
     btnSaveSettings.addEventListener('click', () => {
@@ -394,8 +426,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       if(!birthStr) { alert('生まれた日付を選択してください。'); return; }
 
-      const lifeAge = document.getElementById('input-life').value;
-      if(!lifeAge) { alert('寿命を設定してください。'); return; }
+      const inputLife = document.getElementById('input-life');
+      const lifeAge = inputLife ? inputLife.value : 30;
 
       const newCustoms = [];
       const customsCount = config.customs?.length || 0;
@@ -414,16 +446,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (hasError) return; 
 
+      // データを確定
       config = { birth: birthStr, lifeAge: lifeAge, customs: newCustoms };
       localStorage.setItem('lifeTrackerConfig', JSON.stringify(config));
       
-      buildDOMFlow();
-      currentIndex = 0; // Lifeタブへ強制帰還
-      updateCarousel();
-      startRenderLoop();
+      // 保存中アニメーションの実行
+      const overlay = document.getElementById('saving-overlay');
+      const spinner = document.getElementById('saving-spinner');
+      const check = document.getElementById('saving-check');
+      const text = document.getElementById('saving-text');
+      
+      overlay.classList.add('active');
+      spinner.style.display = 'block';
+      check.style.display = 'none';
+      text.textContent = 'Saving...';
+
+      // 1秒後に保存完了表示
+      setTimeout(() => {
+        spinner.style.display = 'none';
+        check.style.display = 'flex';
+        text.textContent = 'Saved!';
+        
+        // さらに0.8秒後に消して、Custom画面へ遷移
+        setTimeout(() => {
+          overlay.classList.remove('active');
+          
+          buildDOMFlow();
+          
+          // ★修正：強制的にLifeに戻すのではなく、Customタブへ移動
+          const targetIndex = flow.findIndex(f => f.tab === 'view-custom');
+          currentIndex = targetIndex !== -1 ? targetIndex : 0; 
+          
+          updateCarousel();
+          startRenderLoop();
+        }, 800);
+      }, 1000);
     });
   }
 
-  // 起動
   init();
 });
