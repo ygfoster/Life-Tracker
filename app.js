@@ -24,7 +24,6 @@ document.addEventListener('DOMContentLoaded', function() {
       config = JSON.parse(rawData);
     }
   } catch (e) {
-    console.warn("Save data corrupted. Resetting...");
     config = null;
   }
   if (!config) config = { birth: '', lifeAge: 30, customs: [] };
@@ -36,8 +35,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
   var swipeWrapper = document.getElementById('swipe-wrapper');
   var tabs = document.querySelectorAll('.tab-item');
-  var setupOverlay = document.getElementById('setup-overlay');
-  var btnStartSetup = document.getElementById('btn-start-setup');
 
   var colors = {
     life: ['#FF453A', '#FF9F0A'],
@@ -45,37 +42,16 @@ document.addEventListener('DOMContentLoaded', function() {
     custom: ['#BF5AF2', '#FF375F']
   };
 
+  // ★修正: オーバーレイ関連のロジックを完全排除し、直接メインUIを起動
   function init() {
     injectSVGDefs();
     injectSavingOverlay();
-    if (!config.birth || config.birth === '') {
-      if(setupOverlay) {
-        setupOverlay.style.display = 'flex';
-        setupOverlay.style.opacity = '1';
-      }
-      initDatePicker('picker-birth', null);
-      initLifeStepper();
-    } else {
-      if(setupOverlay) setupOverlay.style.display = 'none';
-      startMainUI(false);
-    }
+    startMainUI();
   }
 
-  // ★修正: startMainUI に moveToSettings 引数を追加し、初期化後に確実に移動させる
-  function startMainUI(moveToSettings) {
+  function startMainUI() {
     buildDOMFlow();
     populateSettings();
-    
-    if (moveToSettings) {
-      var targetIndex = -1;
-      for(var i=0; i<flow.length; i++) {
-        if (flow[i].tab === 'view-settings') { targetIndex = i; break; }
-      }
-      if(targetIndex !== -1) { 
-        currentIndex = targetIndex; 
-      }
-    }
-    
     updateCarousel();
     startRenderLoop();
   }
@@ -258,7 +234,7 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function calculateLife(now) {
-    if(!config.birth) return calculateDiff(null, null, true);
+    if(!config.birth || config.birth === '') return calculateDiff(null, null, true);
     var birth = new Date(config.birth); var end = new Date(birth);
     end.setFullYear(birth.getFullYear() + Number(config.lifeAge ? config.lifeAge : 30));
     return calculateDiff(now, end, true);
@@ -422,4 +398,7 @@ document.addEventListener('DOMContentLoaded', function() {
   function initLifeStepper() {
     var wrap = document.getElementById('input-life-wrap');
     if(!wrap) return;
-    wrap.innerHTML = '<div class="life-setting-group"><div class="input-suffix-wrap"><input type="number" id="input-life" cl
+    wrap.innerHTML = '<div class="life-setting-group"><div class="input-suffix-wrap"><input type="number" id="input-life" class="input-field" value="' + (config.lifeAge ? config.lifeAge : 30) + '" readonly><span class="suffix">歳まで</span></div><div class="stepper-controls"><button type="button" class="stepper-btn" id="btn-life-minus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="5" y1="12" x2="19" y2="12" stroke-width="2" stroke-linecap="round"/></svg></button><button type="button" class="stepper-btn" id="btn-life-plus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19" stroke-width="2" stroke-linecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke-width="2" stroke-linecap="round"/></svg></button></div></div>';
+    
+    var inputLife = document.getElementById('input-life');
+    document.getElementById('btn-life-minus').addEven
