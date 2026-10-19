@@ -1,5 +1,8 @@
 document.addEventListener('DOMContentLoaded', function() {
-  function padZero(num) { var s = String(num); return s.length < 2 ? '0' + s : s; }
+  function padZero(num) {
+    var s = String(num);
+    return s.length < 2 ? '0' + s : s;
+  }
   function getClosest(elem, selector) {
     while (elem && elem !== document) {
       if (elem.matches && elem.matches(selector)) return elem;
@@ -8,13 +11,20 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     return null;
   }
-  function removeEl(el) { if (el && el.parentNode) { el.parentNode.removeChild(el); } }
+  function removeEl(el) {
+    if (el && el.parentNode) {
+      el.parentNode.removeChild(el);
+    }
+  }
 
   var config = null;
   try {
     var rawData = localStorage.getItem('lifeTrackerConfig');
-    if (rawData) config = JSON.parse(rawData);
+    if (rawData) {
+      config = JSON.parse(rawData);
+    }
   } catch (e) {
+    console.warn("Save data corrupted. Resetting...");
     config = null;
   }
   if (!config) config = { birth: '', lifeAge: 30, customs: [] };
@@ -29,24 +39,43 @@ document.addEventListener('DOMContentLoaded', function() {
   var setupOverlay = document.getElementById('setup-overlay');
   var btnStartSetup = document.getElementById('btn-start-setup');
 
-  var colors = { life: ['#FF453A', '#FF9F0A'], born: ['#30D158', '#34C759'], custom: ['#BF5AF2', '#FF375F'] };
+  var colors = {
+    life: ['#FF453A', '#FF9F0A'],
+    born: ['#30D158', '#34C759'],
+    custom: ['#BF5AF2', '#FF375F']
+  };
 
   function init() {
     injectSVGDefs();
     injectSavingOverlay();
     if (!config.birth || config.birth === '') {
-      if(setupOverlay) setupOverlay.style.display = 'flex';
+      if(setupOverlay) {
+        setupOverlay.style.display = 'flex';
+        setupOverlay.style.opacity = '1';
+      }
       initDatePicker('picker-birth', null);
       initLifeStepper();
     } else {
       if(setupOverlay) setupOverlay.style.display = 'none';
-      startMainUI();
+      startMainUI(false);
     }
   }
 
-  function startMainUI() {
+  // ★修正: startMainUI に moveToSettings 引数を追加し、初期化後に確実に移動させる
+  function startMainUI(moveToSettings) {
     buildDOMFlow();
     populateSettings();
+    
+    if (moveToSettings) {
+      var targetIndex = -1;
+      for(var i=0; i<flow.length; i++) {
+        if (flow[i].tab === 'view-settings') { targetIndex = i; break; }
+      }
+      if(targetIndex !== -1) { 
+        currentIndex = targetIndex; 
+      }
+    }
+    
     updateCarousel();
     startRenderLoop();
   }
@@ -393,4 +422,232 @@ document.addEventListener('DOMContentLoaded', function() {
   function initLifeStepper() {
     var wrap = document.getElementById('input-life-wrap');
     if(!wrap) return;
-    wrap.innerHTML = '<div class="life-setting-group"><div class="input-suffix-wrap"><input type="number" id="input-life" class="input-field" value="' + (config.lifeAge ? config.lifeAge : 30) + '" readonly><span class="suffix">歳まで</span></div><div class="stepper-controls"><button type="button" class="stepper-btn" id="btn-life-minus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="5" y1="12" x2="19" y2="12" stroke-width="2" stroke-linecap="round"/></svg></button><button type="button" class="stepper-btn" id="btn-life-plus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="1
+    wrap.innerHTML = '<div class="life-setting-group"><div class="input-suffix-wrap"><input type="number" id="input-life" class="input-field" value="' + (config.lifeAge ? config.lifeAge : 30) + '" readonly><span class="suffix">歳まで</span></div><div class="stepper-controls"><button type="button" class="stepper-btn" id="btn-life-minus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="5" y1="12" x2="19" y2="12" stroke-width="2" stroke-linecap="round"/></svg></button><button type="button" class="stepper-btn" id="btn-life-plus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19" stroke-width="2" stroke-linecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke-width="2" stroke-linecap="round"/></svg></button></div></div>';
+    
+    var inputLife = document.getElementById('input-life');
+    document.getElementById('btn-life-minus').addEventListener('click', function() {
+      var val = parseInt(inputLife.value);
+      if(isNaN(val)) val = 30;
+      if(val > 1) inputLife.value = val - 1;
+    });
+    document.getElementById('btn-life-plus').addEventListener('click', function() {
+      var val = parseInt(inputLife.value);
+      if(isNaN(val)) val = 30;
+      if(val < 150) inputLife.value = val + 1;
+    });
+  }
+
+  function populateSettings() {
+    initDatePicker('picker-birth', config.birth);
+    initLifeStepper();
+    renderCustomSettings();
+  }
+
+  function renderCustomSettings() {
+    var list = document.getElementById('custom-settings-list');
+    if(!list) return;
+    list.innerHTML = '';
+    var customs = config.customs ? config.customs : [];
+    for(var i=0; i<customs.length; i++) {
+      (function(c, index) {
+        var pId = 'picker-custom-' + index;
+        var container = document.createElement('div');
+        container.className = 'swipe-item-container';
+        container.id = 'swipe-item-' + index; 
+        
+        container.innerHTML = '<div class="swipe-actions-bg"><button class="swipe-delete-btn" onclick="removeCustom(' + index + ')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>削除</button></div><div class="swipe-content" id="swipe-content-' + index + '" style="transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);"><div class="custom-item-header" style="margin-bottom: 20px;"><div style="flex: 1;"><label class="custom-input-label">タイトル</label><input type="text" class="input-field" placeholder="例: 禁煙" value="' + (c.title ? c.title : '') + '" id="custom-title-' + index + '" style="width: 100%;"></div></div><div><label class="custom-input-label">開始した日付を設定</label><div class="date-picker-group" id="' + pId + '"></div></div><div class="error-msg" id="error-custom-' + index + '">未来の日付は選択できません</div></div>';
+        
+        list.appendChild(container);
+        initDatePicker(pId, c.start);
+
+        var swipeContent = container.querySelector('.swipe-content');
+        var startX = 0, currentX = 0;
+        
+        swipeContent.addEventListener('touchstart', function(e) {
+          if(getClosest(e.target, '.custom-date-options')) return;
+          var allContents = document.querySelectorAll('.swipe-content');
+          for(var s=0; s<allContents.length; s++) {
+            if (allContents[s] !== swipeContent) allContents[s].style.transform = 'translateX(0)';
+          }
+          if(document.activeElement === container.querySelector('#custom-title-' + index)) return;
+          swipeContent.style.transition = 'none'; 
+          startX = e.touches[0].clientX;
+        }, {passive: true});
+
+        swipeContent.addEventListener('touchmove', function(e) {
+          if(document.activeElement === container.querySelector('#custom-title-' + index)) return;
+          if(getClosest(e.target, '.custom-date-options')) return;
+          currentX = e.touches[0].clientX - startX;
+          if(currentX > 0) currentX = 0; 
+          if(currentX < -100) currentX = -100; 
+          swipeContent.style.transform = 'translateX(' + currentX + 'px)';
+        }, {passive: true});
+
+        swipeContent.addEventListener('touchend', function() {
+          if(document.activeElement === container.querySelector('#custom-title-' + index)) return;
+          if(currentX === 0) return; 
+
+          swipeContent.style.transition = 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)';
+          if(currentX < -25) {
+            swipeContent.style.transform = 'translateX(-80px)';
+          } else {
+            swipeContent.style.transform = 'translateX(0)'; 
+          }
+          currentX = 0; 
+        }, {passive: true});
+      })(customs[i], i);
+    }
+    
+    var addBtn = document.getElementById('btn-add-custom');
+    if(addBtn) addBtn.style.display = customs.length >= 3 ? 'none' : 'block';
+  }
+
+  var btnAddCustom = document.getElementById('btn-add-custom');
+  if(btnAddCustom) {
+    btnAddCustom.addEventListener('click', function() {
+      if(!config.customs) config.customs = [];
+      if(config.customs.length < 3) { config.customs.push({ title: '', start: null }); renderCustomSettings(); }
+    });
+  }
+
+  window.removeCustom = function(index) {
+    var itemContainer = document.getElementById('swipe-item-' + index);
+    if (itemContainer) {
+      itemContainer.style.transition = 'opacity 1.0s ease, transform 1.0s cubic-bezier(0.4, 0, 0.2, 1)';
+      itemContainer.style.opacity = '0';
+      itemContainer.style.transform = 'translateX(-100%)';
+      
+      setTimeout(function() {
+        var h = itemContainer.offsetHeight;
+        var mb = 16; 
+        
+        itemContainer.style.transition = 'none';
+        itemContainer.style.height = h + 'px';
+        itemContainer.style.marginBottom = mb + 'px';
+        itemContainer.style.padding = '0px';
+        itemContainer.style.border = 'none';
+        itemContainer.style.overflow = 'hidden';
+        itemContainer.innerHTML = ''; 
+        
+        requestAnimationFrame(function() {
+          itemContainer.style.transition = 'height 0.4s cubic-bezier(0.32, 0.72, 0, 1), margin-bottom 0.4s cubic-bezier(0.32, 0.72, 0, 1)';
+          itemContainer.style.height = '0px';
+          itemContainer.style.marginBottom = '0px';
+        });
+      }, 1000);
+
+      setTimeout(function() {
+        executeRemoveCustom(index);
+      }, 1400);
+    } else {
+      executeRemoveCustom(index);
+    }
+  };
+
+  function executeRemoveCustom(index) {
+    var customsCount = (config.customs && config.customs.length) ? config.customs.length : 0;
+    for(var i=0; i<customsCount; i++) {
+      var tInput = document.getElementById('custom-title-' + i);
+      if(tInput) config.customs[i].title = tInput.value;
+      var cStr = getPickerDate('picker-custom-' + i);
+      if(cStr) config.customs[i].start = cStr;
+    }
+    config.customs.splice(index, 1);
+    localStorage.setItem('lifeTrackerConfig', JSON.stringify(config));
+    renderCustomSettings();
+  }
+
+  function isFutureDate(dateStr) {
+    if(!dateStr) return false;
+    var selected = new Date(dateStr);
+    var now = new Date(); now.setHours(23, 59, 59, 999);
+    return selected > now;
+  }
+
+  // ★修正: アニメーションの完了を確実に待つイベントベースの遷移
+  if (btnStartSetup) {
+    btnStartSetup.addEventListener('click', function(e) {
+      e.preventDefault();
+      
+      var isTransitioning = false;
+
+      function onTransitionEnd() {
+        if (isTransitioning) return;
+        isTransitioning = true;
+        setupOverlay.removeEventListener('transitionend', onTransitionEnd);
+        setupOverlay.style.display = 'none';
+        startMainUI(true);
+      }
+
+      // トランジションが設定されていない、または何らかの理由で発火しない場合のためのフォールバック
+      setTimeout(function() {
+        if (!isTransitioning) {
+           onTransitionEnd();
+        }
+      }, 350);
+
+      setupOverlay.addEventListener('transitionend', onTransitionEnd);
+      
+      // opacityを0にしてフェードアウト開始
+      setupOverlay.style.transition = 'opacity 0.3s ease';
+      setupOverlay.style.opacity = '0';
+    });
+  }
+
+  var btnSaveSettings = document.getElementById('btn-save-settings');
+  if (btnSaveSettings) {
+    btnSaveSettings.addEventListener('click', function(e) {
+      e.preventDefault();
+      var hasError = false;
+      var birthStr = getPickerDate('picker-birth');
+      if(birthStr && isFutureDate(birthStr)) { document.getElementById('picker-birth').classList.add('has-error'); hasError = true; }
+      if(!birthStr) { alert('生まれた日付を選択してください。'); return; }
+      var inputLife = document.getElementById('input-life');
+      var lifeAge = inputLife ? inputLife.value : 30;
+
+      var newCustoms = [];
+      var customsCount = (config.customs && config.customs.length) ? config.customs.length : 0;
+      for(var i=0; i<customsCount; i++) {
+        var tInput = document.getElementById('custom-title-' + i);
+        var tVal = tInput ? tInput.value : '';
+        var cStr = getPickerDate('picker-custom-' + i);
+        if(cStr && isFutureDate(cStr)) { document.getElementById('picker-custom-' + i).classList.add('has-error'); hasError = true; }
+        else if (cStr) { newCustoms.push({ title: tVal, start: cStr }); }
+      }
+      if (hasError) return; 
+
+      config = { birth: birthStr, lifeAge: lifeAge, customs: newCustoms };
+      localStorage.setItem('lifeTrackerConfig', JSON.stringify(config));
+      
+      var overlay = document.getElementById('saving-overlay');
+      var spinner = document.getElementById('saving-spinner');
+      var check = document.getElementById('saving-check');
+      var text = document.getElementById('saving-text');
+      
+      overlay.classList.add('active');
+      spinner.style.display = 'block';
+      check.style.display = 'none';
+      text.textContent = '保存中...';
+
+      setTimeout(function() {
+        spinner.style.display = 'none';
+        check.style.display = 'flex';
+        text.textContent = '保存完了';
+        
+        setTimeout(function() {
+          overlay.classList.remove('active');
+          buildDOMFlow();
+          var targetIndex = 0;
+          for(var f=0; f<flow.length; f++) {
+            if(flow[f].tab === 'view-custom') { targetIndex = f; break; }
+          }
+          currentIndex = targetIndex; 
+          updateCarousel();
+          startRenderLoop();
+        }, 1000);
+      }, 800);
+    });
+  }
+  
+  init();
+});
