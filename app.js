@@ -116,7 +116,6 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateCarousel() {
     if(flow.length === 0 || !swipeWrapper) return;
     
-    // 画面遷移時にスワイプ削除をすべて強制リセット
     document.querySelectorAll('.swipe-content').forEach(el => {
       el.style.transform = 'translateX(0)';
     });
@@ -155,7 +154,6 @@ document.addEventListener('DOMContentLoaded', () => {
   let touchStartX = 0, touchStartY = 0;
   const mainContent = document.getElementById('main-content');
 
-  // 余白タッチでもスワイプ削除を閉じる処理
   document.addEventListener('touchstart', (e) => {
     if (!e.target.closest('.swipe-item-container')) {
       document.querySelectorAll('.swipe-content').forEach(el => {
@@ -164,16 +162,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }, {passive: true});
 
-  // 画面全体のスワイプ（タブ切り替え）判定
   if(mainContent) {
     mainContent.addEventListener('touchstart', e => {
-      // Swipe-to-deleteのカード内やドロップダウン操作中は画面遷移をブロック
-      if (e.target.closest('.swipe-content') || e.target.closest('button') || e.target.closest('.custom-date-picker-wrap')) return;
+      // ★ ピッカーのリストが開いている時だけ画面遷移スワイプを無効化
+      if (e.target.closest('.swipe-content') || e.target.closest('button') || e.target.closest('.custom-date-options')) return;
       touchStartX = e.changedTouches[0].screenX;
       touchStartY = e.changedTouches[0].screenY;
     }, {passive: true});
     mainContent.addEventListener('touchend', e => {
-      if (e.target.closest('.swipe-content') || e.target.closest('button') || e.target.closest('.custom-date-picker-wrap')) return;
+      if (e.target.closest('.swipe-content') || e.target.closest('button') || e.target.closest('.custom-date-options')) return;
       let dx = e.changedTouches[0].screenX - touchStartX;
       let dy = e.changedTouches[0].screenY - touchStartY;
       if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
@@ -445,45 +442,39 @@ document.addEventListener('DOMContentLoaded', () => {
       list.appendChild(container);
       initDatePicker(pId, c.start);
 
-      // ★ 根本から設計し直した、トリガー式スワイプアニメーション
       const swipeContent = container.querySelector('.swipe-content');
       let startX = 0, currentX = 0;
       
       swipeContent.addEventListener('touchstart', (e) => {
-        // ドロップダウン操作中のみスワイプを無効化（input上でもスワイプ可能に修正）
-        if(e.target.closest('.custom-date-picker-wrap')) return;
+        // ★ ドロップダウンのリスト内操作中のみスワイプを無効化（ピッカー上からはスワイプ可能）
+        if(e.target.closest('.custom-date-options')) return;
         
-        // 他の開いているスワイプ項目をすべて閉じる
         document.querySelectorAll('.swipe-content').forEach(el => {
           if (el !== swipeContent) el.style.transform = 'translateX(0)';
         });
         
-        // inputにフォーカスが当たっている場合はスワイプさせない（文字入力の邪魔をしないため）
         if(document.activeElement === container.querySelector(`#custom-title-${index}`)) return;
-
         startX = e.touches[0].clientX;
       }, {passive: true});
 
       swipeContent.addEventListener('touchmove', (e) => {
         if(document.activeElement === container.querySelector(`#custom-title-${index}`)) return;
-        if(e.target.closest('.custom-date-picker-wrap')) return;
+        if(e.target.closest('.custom-date-options')) return;
         
         currentX = e.touches[0].clientX - startX;
       }, {passive: true});
 
       swipeContent.addEventListener('touchend', () => {
         if(document.activeElement === container.querySelector(`#custom-title-${index}`)) return;
-        if(currentX === 0) return; // タップしただけの時は無視
+        if(currentX === 0) return; 
 
-        // ★ 指の追従を廃止し、25px以上弾いた瞬間に「一瞬で開く/閉じる」トリガー式に変更
+        // ★ 追従アニメーションを廃止し、一瞬で開閉するトリガー式アニメーションに変更
         if(currentX < -25) {
-          // 左へ軽くフリック → 一気に開く
           swipeContent.style.transform = `translateX(-80px)`;
         } else if (currentX > 25) {
-          // 右へ軽くフリック → 一気に閉じる
           swipeContent.style.transform = `translateX(0)`; 
         }
-        currentX = 0; // 状態リセット
+        currentX = 0; 
       }, {passive: true});
     });
     
@@ -498,25 +489,35 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // ★ 究極の「物理的消滅アニメーション（iOSライク）」
   window.removeCustom = function(index) {
     const itemContainer = document.getElementById(`swipe-item-${index}`);
     if (itemContainer) {
-      itemContainer.style.transition = 'all 0.35s cubic-bezier(0.2, 0.9, 0.2, 1)';
-      itemContainer.style.transform = 'scale(0.95) translateX(-20px)';
+      // 1. 左へ一気にスライドアウトしながら透明になる
+      itemContainer.style.transition = 'opacity 0.25s ease, transform 0.25s cubic-bezier(0.2, 0.9, 0.2, 1)';
       itemContainer.style.opacity = '0';
+      itemContainer.style.transform = 'scale(0.95) translateX(-100%)';
       
-      requestAnimationFrame(() => {
-        itemContainer.style.maxHeight = itemContainer.offsetHeight + 'px';
+      // 2. 少し遅れて、空いた空間が滑らかにシュッと閉じる
+      setTimeout(() => {
+        const h = itemContainer.offsetHeight;
+        itemContainer.style.transition = 'none';
+        itemContainer.style.height = h + 'px'; 
+        itemContainer.style.overflow = 'hidden';
+        
         requestAnimationFrame(() => {
-          itemContainer.style.maxHeight = '0px';
-          itemContainer.style.margin = '0px';
-          itemContainer.style.overflow = 'hidden';
+          itemContainer.style.transition = 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1), margin-bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+          itemContainer.style.height = '0px';
+          itemContainer.style.marginBottom = '0px';
+          itemContainer.style.paddingTop = '0px';
+          itemContainer.style.paddingBottom = '0px';
         });
-      });
+      }, 200);
 
+      // 3. アニメーション完了後にDOMから削除
       setTimeout(() => {
         executeRemoveCustom(index);
-      }, 350);
+      }, 500);
     } else {
       executeRemoveCustom(index);
     }
