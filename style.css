@@ -6,11 +6,9 @@
   --text-secondary: #a1a1aa;
   --border-color: #27272a;
   --danger-color: #FF453A;
-  
   --color-life: url(#grad-life);
   --color-born: url(#grad-born);
   --color-custom: url(#grad-custom);
-  
   --nav-height: 90px;
 }
 
@@ -60,10 +58,7 @@ body { font-family: 'Inter', -apple-system, sans-serif; background-color: var(--
 .input-suffix-wrap { position: relative; display: flex; align-items: center; }
 .suffix { position: absolute; right: 16px; color: var(--text-secondary); font-weight: 500; pointer-events: none; }
 
-input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-input[type="number"] { -moz-appearance: textfield; }
-
-/* 寿命設定の分離型UI（横並び強制・左詰め） */
+/* 寿命設定ステッパー */
 .life-setting-group { display: flex; align-items: center; gap: 12px; width: 100%; }
 .life-setting-group .input-suffix-wrap { flex: 1; }
 .stepper-controls { display: flex; gap: 8px; flex-shrink: 0; }
@@ -71,24 +66,34 @@ input[type="number"] { -moz-appearance: textfield; }
 .stepper-btn:active { background: #333; transform: scale(0.92); border-color: var(--text-secondary); }
 .stepper-btn svg { width: 20px; height: 20px; }
 
-/* ピッカー（右寄せに変更・被り完全防止） */
+/* 新：完全オリジナル カスタムドロップダウン (システム感排除) */
 .date-picker-group { display: flex; gap: 10px; width: 100%; }
-.apple-select-wrap { position: relative; flex: 1; }
-.apple-select { appearance: none; -webkit-appearance: none; width: 100%; background: var(--input-bg); border: 1px solid transparent; color: var(--text-primary); padding: 16px 40px 16px 12px; border-radius: 16px; font-size: 1.05rem; text-align: right; font-weight: 500; outline: none; transition: all 0.2s; font-family: 'Inter', sans-serif; }
-.apple-select:focus { background: var(--surface-color); border-color: #555; }
-.apple-select-wrap::after { content: '▼'; position: absolute; right: 10px; top: 50%; transform: translateY(-50%) scale(0.6); color: var(--text-secondary); pointer-events: none; opacity: 0.5; }
-.unit-label { position: absolute; right: 24px; top: 50%; transform: translateY(-50%); font-size: 0.9rem; color: var(--text-secondary); pointer-events: none; }
+.custom-date-picker-wrap { position: relative; flex: 1; z-index: 1; }
+.custom-date-display { width: 100%; background: var(--input-bg); border: 1px solid transparent; color: var(--text-primary); padding: 16px 40px 16px 12px; border-radius: 16px; font-size: 1.05rem; text-align: right; font-weight: 500; cursor: pointer; transition: all 0.2s; font-family: 'Inter', sans-serif; }
+.custom-date-display.active { background: var(--surface-color); border-color: #555; }
+.custom-date-display::after { content: '▼'; position: absolute; right: 10px; top: 50%; transform: translateY(-50%) scale(0.6); color: var(--text-secondary); opacity: 0.5; transition: transform 0.2s; pointer-events: none; }
+.custom-date-display.active::after { transform: translateY(-50%) scale(0.6) rotate(180deg); }
+.custom-date-unit { position: absolute; right: 24px; top: 50%; transform: translateY(-50%); font-size: 0.9rem; color: var(--text-secondary); pointer-events: none; }
 
-.has-error .apple-select, .has-error .input-field { border-color: var(--danger-color); background: rgba(255, 69, 58, 0.05); }
+.custom-date-options { position: absolute; top: calc(100% + 8px); left: 0; right: 0; background: #1c1c1e; border: 1px solid var(--border-color); border-radius: 12px; max-height: 220px; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.8); opacity: 0; pointer-events: none; transform: translateY(-10px); transition: all 0.2s cubic-bezier(0.2, 0.9, 0.2, 1); }
+.custom-date-options.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
+.custom-date-option { padding: 12px 16px; text-align: center; color: var(--text-primary); font-size: 1rem; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.1s; }
+.custom-date-option:last-child { border-bottom: none; }
+.custom-date-option:active { background: var(--border-color); }
+.custom-date-option.selected { font-weight: 700; color: #0A84FF; }
+
+.has-error .custom-date-display, .has-error .input-field { border-color: var(--danger-color); background: rgba(255, 69, 58, 0.05); }
 .error-msg { color: var(--danger-color); font-size: 0.8rem; margin-top: 8px; display: none; font-weight: 500; }
 .has-error ~ .error-msg { display: block; animation: shake 0.3s ease-in-out; }
 
+/* 新：Swipe-to-delete コンポーネント */
 .custom-settings-list { display: flex; flex-direction: column; gap: 16px; }
-.custom-item-card { background: var(--surface-color); padding: 20px; border-radius: 20px; border: 1px solid var(--border-color); }
-.custom-item-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 16px; }
-.btn-icon-danger { background: none; border: none; color: var(--danger-color); cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; transition: transform 0.2s, opacity 0.2s; opacity: 0.8; }
-.btn-icon-danger:active { transform: scale(0.85); opacity: 1; }
-.btn-icon-danger svg { width: 22px; height: 22px; stroke-width: 2; }
+.swipe-item-container { position: relative; width: 100%; margin-bottom: 16px; }
+.swipe-actions-bg { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: var(--danger-color); border-radius: 20px; display: flex; justify-content: flex-end; z-index: 1; }
+.swipe-delete-btn { width: 80px; height: 100%; background: none; border: none; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; font-size: 0.75rem; font-weight: 600; gap: 4px; }
+.swipe-delete-btn svg { width: 24px; height: 24px; stroke-width: 2; }
+.swipe-content { position: relative; z-index: 2; background: var(--surface-color); padding: 20px; border-radius: 20px; border: 1px solid var(--border-color); transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.2, 1); }
+
 .divider { border: none; border-top: 1px solid var(--border-color); margin: 32px 0; }
 .form-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 
@@ -104,13 +109,12 @@ input[type="number"] { -moz-appearance: textfield; }
 .setup-card h2 { font-size: 2rem; font-weight: 300; margin-bottom: 12px; }
 .setup-card p { color: var(--text-secondary); margin-bottom: 32px; }
 
-/* 保存アニメーション（完全なグレー＆ホワイトの洗練デザイン） */
+/* 保存アニメーション */
 .saving-overlay { position: fixed; inset: 0; background-color: rgba(0, 0, 0, 0.75); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 10000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
 .saving-overlay.active { opacity: 1; pointer-events: auto; }
 .saving-box { background-color: rgba(28, 28, 30, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 24px; padding: 32px 40px; display: flex; flex-direction: column; align-items: center; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8); transform: scale(0.95); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
 .saving-overlay.active .saving-box { transform: scale(1); }
 .saving-spinner { width: 48px; height: 48px; border: 3px solid rgba(255, 255, 255, 0.1); border-top-color: #fafafa; border-radius: 50%; animation: spin 0.8s linear infinite; }
-/* AIっぽい緑を排除し、ダークグレーの洗練された背景に変更 */
 .saving-check { width: 52px; height: 52px; border-radius: 50%; display: none; align-items: center; justify-content: center; background-color: rgba(255, 255, 255, 0.15); color: #fafafa; animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
 .saving-check svg { width: 26px; height: 26px; stroke-width: 2.5; }
 .saving-text { margin-top: 20px; font-size: 1rem; font-weight: 600; color: #fafafa; letter-spacing: 0.05em; }
