@@ -1,488 +1,117 @@
-document.addEventListener('DOMContentLoaded', () => {
-  let config = JSON.parse(localStorage.getItem('lifeTrackerConfig'));
-  if (!config) config = { birth: '', lifeAge: 30, customs: [] };
-  if (!config.customs) config.customs = [];
+:root {
+  --bg-color: #000000;
+  --surface-color: #121214;
+  --input-bg: rgba(255, 255, 255, 0.06);
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --border-color: #27272a;
+  --danger-color: #FF453A;
+  
+  --color-life: url(#grad-life);
+  --color-born: url(#grad-born);
+  --color-custom: url(#grad-custom);
+  
+  --nav-height: 90px;
+}
 
-  let flow = []; 
-  let currentIndex = 0;
-  let animationFrameId = null;
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body { font-family: 'Inter', -apple-system, sans-serif; background-color: var(--bg-color); color: var(--text-primary); line-height: 1.5; -webkit-font-smoothing: antialiased; overflow: hidden; touch-action: none; }
+.app-container { position: relative; width: 100vw; height: 100vh; }
+.viewport { width: 100vw; height: calc(100vh - var(--nav-height)); overflow: hidden; }
+.swipe-wrapper { display: flex; width: 100%; height: 100%; transition: transform 0.45s cubic-bezier(0.25, 1, 0.4, 1); will-change: transform; }
+.view-section { flex: 0 0 100vw; width: 100vw; height: 100%; display: flex; flex-direction: column; align-items: center; padding: 60px 20px 20px; }
+.view-section.scrollable { overflow-y: auto; align-items: stretch; padding-bottom: 80px; touch-action: pan-y; }
+.view-title { font-size: 1.6rem; font-weight: 400; letter-spacing: 0.1em; color: var(--text-secondary); margin-bottom: 40px; text-align: center; }
 
-  const swipeWrapper = document.getElementById('swipe-wrapper');
-  const tabs = document.querySelectorAll('.tab-item');
-  const setupOverlay = document.getElementById('setup-overlay');
-  const btnStartSetup = document.getElementById('btn-start-setup');
+/* タイマー描画 */
+.timer-display { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; }
+.circle-wrapper { position: relative; width: 280px; height: 280px; margin-bottom: 40px; }
+.circle-svg { transform: rotate(-90deg); width: 100%; height: 100%; }
+.circle-bg { fill: none; stroke: var(--surface-color); stroke-width: 6; }
+.circle-progress { fill: none; stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset 0.8s ease-out; }
+.circle-content { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+.circle-value { font-size: 5.5rem; font-weight: 200; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.circle-unit { font-size: 1rem; font-weight: 400; color: var(--text-secondary); margin-top: 4px; }
+.sub-timer-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; width: 100%; max-width: 320px; }
+.sub-timer-item { display: flex; flex-direction: column; align-items: center; }
+.sub-value { font-size: 2rem; font-weight: 300; font-variant-numeric: tabular-nums; }
+.sub-unit { font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px; }
+.custom-indicators { position: absolute; bottom: calc(var(--nav-height) + 20px); left: 0; right: 0; display: flex; gap: 8px; justify-content: center; pointer-events: none; z-index: 50; opacity: 0; transition: opacity 0.3s; }
+.custom-indicators.show { opacity: 1; }
+.indicator-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border-color); transition: 0.3s; }
+.indicator-dot.active { background: var(--text-primary); transform: scale(1.2); }
 
-  const colors = {
-    life: ['#FF453A', '#FF9F0A'],
-    born: ['#30D158', '#34C759'],
-    custom: ['#BF5AF2', '#FF375F']
-  };
+/* ナビゲーション */
+.floating-tab-bar { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); width: calc(100% - 40px); max-width: 400px; height: 64px; background: rgba(18, 18, 20, 0.85); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 32px; display: flex; justify-content: space-around; align-items: center; z-index: 100; box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
+.tab-item { background: none; border: none; color: #636366; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; width: 60px; height: 100%; cursor: pointer; transition: all 0.2s ease; }
+.tab-item svg { width: 22px; height: 22px; stroke-width: 1.8; }
+.tab-item span { font-size: 0.65rem; font-weight: 600; }
+.tab-item.active { color: var(--text-primary); }
+.tab-item.active svg { stroke-width: 2.5; }
 
-  // --- 初期化 ---
-  function init() {
-    injectSVGDefs();
-    injectSavingOverlay(); // 保存時オーバーレイのDOM追加
-    
-    if (!config.birth) {
-      setupOverlay.style.display = 'flex';
-      initDatePicker('picker-birth', null);
-      initLifeStepper();
-    } else {
-      setupOverlay.style.display = 'none';
-      startMainUI();
-    }
-  }
+/* フォーム */
+.settings-form { max-width: 400px; margin: 0 auto; width: 100%; }
+.form-group { margin-bottom: 24px; }
+.form-group label, .form-header-row label { display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 10px; font-weight: 500; }
+.input-field { width: 100%; background: var(--input-bg); border: 1px solid transparent; color: var(--text-primary); padding: 16px; border-radius: 16px; font-size: 1rem; outline: none; transition: all 0.2s; font-family: 'Inter', sans-serif; appearance: none; -webkit-appearance: none; }
+.input-field:focus { background: var(--surface-color); border-color: #555; }
+.input-suffix-wrap { position: relative; display: flex; align-items: center; }
+.suffix { position: absolute; right: 16px; color: var(--text-secondary); font-weight: 500; pointer-events: none; }
 
-  function startMainUI() {
-    buildDOMFlow();
-    populateSettings();
-    updateCarousel();
-    startRenderLoop();
-  }
+input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; }
 
-  function injectSVGDefs() {
-    if(document.getElementById('svg-defs-container')) return;
-    const svgNS = "http://www.w3.org/2000/svg";
-    const svg = document.createElementNS(svgNS, "svg");
-    svg.id = 'svg-defs-container';
-    svg.style.width = '0'; svg.style.height = '0'; svg.style.position = 'absolute';
-    let defs = document.createElementNS(svgNS, "defs");
-    Object.keys(colors).forEach(key => {
-      let grad = document.createElementNS(svgNS, "linearGradient");
-      grad.setAttribute("id", `grad-${key}`);
-      grad.setAttribute("x1", "0%"); grad.setAttribute("y1", "0%");
-      grad.setAttribute("x2", "100%"); grad.setAttribute("y2", "100%");
-      let stop1 = document.createElementNS(svgNS, "stop");
-      stop1.setAttribute("offset", "0%"); stop1.setAttribute("stop-color", colors[key][0]);
-      let stop2 = document.createElementNS(svgNS, "stop");
-      stop2.setAttribute("offset", "100%"); stop2.setAttribute("stop-color", colors[key][1]);
-      grad.appendChild(stop1); grad.appendChild(stop2); defs.appendChild(grad);
-    });
-    svg.appendChild(defs); document.body.appendChild(svg);
-  }
+/* 新規：寿命設定の分離型UI */
+.life-setting-group { display: flex; align-items: center; gap: 12px; }
+.life-setting-group .input-suffix-wrap { flex: 1; }
+.stepper-controls { display: flex; gap: 8px; }
+.stepper-btn { background: var(--surface-color); border: 1px solid var(--border-color); color: var(--text-primary); width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
+.stepper-btn:active { background: #333; transform: scale(0.92); border-color: var(--text-secondary); }
+.stepper-btn svg { width: 20px; height: 20px; }
 
-  // 保存時オーバーレイの生成
-  function injectSavingOverlay() {
-    if(document.getElementById('saving-overlay')) return;
-    const overlay = document.createElement('div');
-    overlay.id = 'saving-overlay';
-    overlay.className = 'saving-overlay';
-    overlay.innerHTML = `
-      <div class="saving-spinner" id="saving-spinner"></div>
-      <div class="saving-check" id="saving-check">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="20 6 9 17 4 12"></polyline>
-        </svg>
-      </div>
-      <div class="saving-text" id="saving-text">Saving...</div>
-    `;
-    document.body.appendChild(overlay);
-  }
+/* ピッカー等 */
+.date-picker-group { display: flex; gap: 10px; width: 100%; }
+.apple-select-wrap { position: relative; flex: 1; }
+.apple-select { appearance: none; -webkit-appearance: none; width: 100%; background: var(--input-bg); border: 1px solid transparent; color: var(--text-primary); padding: 16px 12px; border-radius: 16px; font-size: 1rem; text-align: center; font-weight: 500; outline: none; transition: all 0.2s; font-family: 'Inter', sans-serif; }
+.apple-select:focus { background: var(--surface-color); border-color: #555; }
+.apple-select-wrap::after { content: '▼'; position: absolute; right: 12px; top: 50%; transform: translateY(-50%) scale(0.6); color: var(--text-secondary); pointer-events: none; opacity: 0.5; }
+.unit-label { position: absolute; right: 28px; top: 50%; transform: translateY(-50%); font-size: 0.8rem; color: var(--text-secondary); pointer-events: none; }
 
-  // --- 画面構築 ---
-  function buildDOMFlow() {
-    if(!swipeWrapper) return;
-    
-    const viewLife = document.getElementById('view-life');
-    const viewBorn = document.getElementById('view-born');
-    const viewSettings = document.getElementById('view-settings');
-    const viewCustomEmpty = document.getElementById('view-custom-empty');
-    
-    document.querySelectorAll('.custom-dynamic-view').forEach(el => el.remove());
+.has-error .apple-select, .has-error .input-field { border-color: var(--danger-color); background: rgba(255, 69, 58, 0.05); }
+.error-msg { color: var(--danger-color); font-size: 0.8rem; margin-top: 8px; display: none; font-weight: 500; }
+.has-error ~ .error-msg { display: block; animation: shake 0.3s ease-in-out; }
 
-    flow = [];
-    if(viewLife) { swipeWrapper.appendChild(viewLife); flow.push({ id: 'view-life', tab: 'view-life' }); }
-    if(viewBorn) { swipeWrapper.appendChild(viewBorn); flow.push({ id: 'view-born', tab: 'view-born' }); }
+.custom-settings-list { display: flex; flex-direction: column; gap: 16px; }
+.custom-item-card { background: var(--surface-color); padding: 20px; border-radius: 20px; border: 1px solid var(--border-color); }
+.custom-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.btn-icon-danger { background: none; border: none; color: var(--danger-color); cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; transition: transform 0.2s, opacity 0.2s; opacity: 0.8; }
+.btn-icon-danger:active { transform: scale(0.85); opacity: 1; }
+.btn-icon-danger svg { width: 20px; height: 20px; stroke-width: 2; }
+.divider { border: none; border-top: 1px solid var(--border-color); margin: 32px 0; }
+.form-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 
-    const customs = config.customs || [];
-    if (customs.length === 0 && viewCustomEmpty) {
-      swipeWrapper.appendChild(viewCustomEmpty);
-      viewCustomEmpty.style.display = 'flex';
-      flow.push({ id: 'view-custom-empty', tab: 'view-custom' });
-    } else if (customs.length > 0) {
-      if(viewCustomEmpty) viewCustomEmpty.style.display = 'none';
-      customs.forEach((c, i) => {
-        const customId = `view-custom-${i}`;
-        const section = document.createElement('section');
-        section.className = 'view-section custom-dynamic-view';
-        section.id = customId;
-        section.innerHTML = `
-          <h1 class="view-title">${c.title || '名称未設定'}</h1>
-          <div class="timer-display" id="timer-${customId}"></div>
-        `;
-        swipeWrapper.appendChild(section);
-        flow.push({ id: customId, tab: 'view-custom', data: c, index: i });
-      });
-    }
+.btn-primary { appearance: none; -webkit-appearance: none; display: block; width: 100%; background: var(--text-primary); color: var(--bg-color); border: none; padding: 18px; border-radius: 16px; font-size: 1.05rem; font-weight: 600; cursor: pointer; transition: transform 0.1s; text-align: center; text-decoration: none; }
+.btn-primary:active { transform: scale(0.96); }
+.btn-text { appearance: none; -webkit-appearance: none; background: none; border: none; color: #0A84FF; font-size: 0.95rem; font-weight: 500; cursor: pointer; }
 
-    if(viewSettings) { swipeWrapper.appendChild(viewSettings); flow.push({ id: 'view-settings', tab: 'view-settings' }); }
-    updateIndicators();
-  }
+/* Empty & Overlay */
+.empty-custom-msg { text-align: center; color: var(--text-secondary); margin-top: 40px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.empty-custom-msg svg { width: 48px; height: 48px; stroke-width: 1; opacity: 0.5; }
+.setup-overlay { position: fixed; inset: 0; background: var(--bg-color); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+.setup-card { text-align: center; padding: 32px; width: 100%; }
+.setup-card h2 { font-size: 2rem; font-weight: 300; margin-bottom: 12px; }
+.setup-card p { color: var(--text-secondary); margin-bottom: 32px; }
 
-  function updateCarousel() {
-    if(flow.length === 0 || !swipeWrapper) return;
-    if(currentIndex < 0) currentIndex = 0;
-    if(currentIndex >= flow.length) currentIndex = flow.length - 1;
-    
-    swipeWrapper.style.transform = `translateX(-${currentIndex * 100}vw)`;
-    
-    const activeTabTarget = flow[currentIndex].tab;
-    tabs.forEach(t => {
-      t.classList.toggle('active', t.getAttribute('data-tab') === activeTabTarget);
-    });
+/* 保存アニメーション（ダークテーマ・洗練版） */
+.saving-overlay { position: fixed; inset: 0; background-color: rgba(0, 0, 0, 0.75); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 10000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+.saving-overlay.active { opacity: 1; pointer-events: auto; }
+.saving-box { background-color: #1c1c1e; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 24px; padding: 32px 40px; display: flex; flex-direction: column; align-items: center; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8); transform: scale(0.95); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+.saving-overlay.active .saving-box { transform: scale(1); }
+.saving-spinner { width: 44px; height: 44px; border: 3px solid rgba(255, 255, 255, 0.1); border-top-color: #fafafa; border-radius: 50%; animation: spin 0.8s linear infinite; }
+.saving-check { width: 44px; height: 44px; border-radius: 50%; display: none; align-items: center; justify-content: center; color: #fafafa; animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+.saving-check svg { width: 28px; height: 28px; stroke-width: 2.5; }
+.saving-text { margin-top: 20px; font-size: 1rem; font-weight: 600; color: #fafafa; letter-spacing: 0.05em; }
 
-    const indContainer = document.getElementById('custom-indicators');
-    if(indContainer) {
-      if (activeTabTarget === 'view-custom' && config.customs && config.customs.length > 1) {
-        indContainer.classList.add('show');
-        Array.from(indContainer.children).forEach((dot, i) => {
-          dot.className = `indicator-dot ${i === flow[currentIndex].index ? 'active' : ''}`;
-        });
-      } else {
-        indContainer.classList.remove('show');
-      }
-    }
-  }
-
-  function updateIndicators() {
-    const indContainer = document.getElementById('custom-indicators');
-    if(!indContainer) return;
-    indContainer.innerHTML = '';
-    if (config.customs && config.customs.length > 1) {
-      config.customs.forEach(() => {
-        let dot = document.createElement('div');
-        dot.className = 'indicator-dot';
-        indContainer.appendChild(dot);
-      });
-    }
-  }
-
-  let touchStartX = 0, touchStartY = 0;
-  const mainContent = document.getElementById('main-content');
-  if(mainContent) {
-    mainContent.addEventListener('touchstart', e => {
-      if (e.target.closest('select') || e.target.closest('input') || e.target.closest('button')) return;
-      touchStartX = e.changedTouches[0].screenX;
-      touchStartY = e.changedTouches[0].screenY;
-    }, {passive: true});
-
-    mainContent.addEventListener('touchend', e => {
-      if (e.target.closest('select') || e.target.closest('input') || e.target.closest('button')) return;
-      let touchEndX = e.changedTouches[0].screenX;
-      let touchEndY = e.changedTouches[0].screenY;
-      let dx = touchEndX - touchStartX;
-      let dy = touchEndY - touchStartY;
-      
-      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
-        if (dx < 0 && currentIndex < flow.length - 1) currentIndex++; 
-        else if (dx > 0 && currentIndex > 0) currentIndex--; 
-        updateCarousel();
-      }
-    }, {passive: true});
-  }
-
-  tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      const targetTab = tab.getAttribute('data-tab');
-      const targetIndex = flow.findIndex(f => f.tab === targetTab);
-      if (targetIndex !== -1) {
-        currentIndex = targetIndex;
-        updateCarousel();
-      }
-    });
-  });
-
-  // --- 時間計算ロジック ---
-  function calculateDiff(startStr, endStr, isCountdown) {
-    if (!startStr || !endStr) return { years: '-', days: '-', hours: '-', minutes: '-', seconds: '-', progress: 0 };
-    let from = new Date(startStr); let to = new Date(endStr);
-    if (isNaN(from.getTime()) || isNaN(to.getTime())) return { years: '-', days: '-', hours: '-', minutes: '-', seconds: '-', progress: 0 };
-    if (isCountdown ? (from > to) : (from > to)) return { years: 0, days: 0, hours: 0, minutes: 0, seconds: 0, progress: 1 };
-
-    let years = to.getFullYear() - from.getFullYear();
-    let tempDate = new Date(from); tempDate.setFullYear(from.getFullYear() + years);
-    if (to < tempDate) { years--; tempDate.setFullYear(from.getFullYear() + years); }
-
-    let remMs = to - tempDate;
-    let days = Math.floor(remMs / (1000 * 60 * 60 * 24));
-    let hours = Math.floor((remMs / (1000 * 60 * 60)) % 24);
-    let minutes = Math.floor((remMs / (1000 * 60)) % 60);
-    let seconds = Math.floor((remMs / 1000) % 60);
-
-    let yearStart = new Date(to.getFullYear(), from.getMonth(), from.getDate());
-    if (to < yearStart) yearStart.setFullYear(yearStart.getFullYear() - 1);
-    let yearEnd = new Date(yearStart); yearEnd.setFullYear(yearEnd.getFullYear() + 1);
-    let progress = (to - yearStart) / (yearEnd - yearStart);
-    if(isCountdown) progress = 1 - progress;
-
-    return { years, days, hours, minutes, seconds, progress };
-  }
-
-  function calculateLife(now) {
-    if(!config.birth) return calculateDiff(null, null, true);
-    const birth = new Date(config.birth);
-    const end = new Date(birth);
-    end.setFullYear(birth.getFullYear() + Number(config.lifeAge || 30));
-    return calculateDiff(now, end, true);
-  }
-
-  function startRenderLoop() {
-    if(animationFrameId) cancelAnimationFrame(animationFrameId);
-    function render() {
-      const now = new Date();
-      [currentIndex - 1, currentIndex, currentIndex + 1].forEach(idx => {
-        if(idx >= 0 && idx < flow.length) {
-          const view = flow[idx];
-          if (view.id === 'view-life') renderTimer('timer-life', calculateLife(now), 'life');
-          else if (view.id === 'view-born') renderTimer('timer-born', calculateDiff(config.birth, now, false), 'born');
-          else if (view.id.startsWith('view-custom-') && view.id !== 'view-custom-empty') {
-             renderTimer(`timer-${view.id}`, calculateDiff(view.data.start, now, false), 'custom');
-          }
-        }
-      });
-      animationFrameId = requestAnimationFrame(render);
-    }
-    render();
-  }
-
-  function renderTimer(containerId, data, colorType) {
-    const container = document.getElementById(containerId);
-    if(!container) return;
-    if (!container.innerHTML) {
-      container.innerHTML = `
-        <div class="circle-wrapper">
-          <svg class="circle-svg" viewBox="0 0 100 100"><circle class="circle-bg" cx="50" cy="50" r="45"></circle><circle class="circle-progress" cx="50" cy="50" r="45" stroke="url(#grad-${colorType})"></circle></svg>
-          <div class="circle-content"><div class="circle-value" id="${containerId}-years">-</div><div class="circle-unit">年</div></div>
-        </div>
-        <div class="sub-timer-grid">
-          <div class="sub-timer-item"><span class="sub-value" id="${containerId}-days">-</span><span class="sub-unit">日</span></div>
-          <div class="sub-timer-item"><span class="sub-value" id="${containerId}-hours">-</span><span class="sub-unit">時間</span></div>
-          <div class="sub-timer-item"><span class="sub-value" id="${containerId}-mins">-</span><span class="sub-unit">分</span></div>
-          <div class="sub-timer-item"><span class="sub-value" id="${containerId}-secs">-</span><span class="sub-unit">秒</span></div>
-        </div>
-      `;
-    }
-    document.getElementById(`${containerId}-years`).textContent = data.years;
-    document.getElementById(`${containerId}-days`).textContent = data.days;
-    document.getElementById(`${containerId}-hours`).textContent = data.hours !== '-' ? String(data.hours).padStart(2, '0') : '-';
-    document.getElementById(`${containerId}-mins`).textContent = data.minutes !== '-' ? String(data.minutes).padStart(2, '0') : '-';
-    document.getElementById(`${containerId}-secs`).textContent = data.seconds !== '-' ? String(data.seconds).padStart(2, '0') : '-';
-    const circle = container.querySelector('.circle-progress');
-    const circumference = 2 * Math.PI * 45;
-    circle.style.strokeDasharray = circumference;
-    circle.style.strokeDashoffset = data.years === '-' ? circumference : circumference - (data.progress * circumference);
-  }
-
-  // --- UIコンポーネント ---
-  function initDatePicker(containerId, initialDateStr) {
-    const container = document.getElementById(containerId);
-    if(!container) return;
-    let initY = '', initM = '', initD = '';
-    if (initialDateStr) {
-      const d = new Date(initialDateStr);
-      if(!isNaN(d.getTime())){ initY = d.getFullYear(); initM = d.getMonth() + 1; initD = d.getDate(); }
-    }
-    const currentYear = new Date().getFullYear();
-    let html = `<div class="apple-select-wrap"><select class="apple-select" id="${containerId}-y"><option value="">--</option>`;
-    for(let y = currentYear; y >= currentYear - 100; y--) html += `<option value="${y}" ${y === initY ? 'selected' : ''}>${y}</option>`;
-    html += `</select><span class="unit-label">年</span></div><div class="apple-select-wrap"><select class="apple-select" id="${containerId}-m"><option value="">--</option>`;
-    for(let m = 1; m <= 12; m++) html += `<option value="${m}" ${m === initM ? 'selected' : ''}>${m}</option>`;
-    html += `</select><span class="unit-label">月</span></div><div class="apple-select-wrap"><select class="apple-select" id="${containerId}-d"><option value="">--</option>`;
-    for(let d = 1; d <= 31; d++) html += `<option value="${d}" ${d === initD ? 'selected' : ''}>${d}</option>`;
-    html += `</select><span class="unit-label">日</span></div>`;
-    container.innerHTML = html;
-
-    const ySel = document.getElementById(`${containerId}-y`);
-    const mSel = document.getElementById(`${containerId}-m`);
-    const dSel = document.getElementById(`${containerId}-d`);
-    
-    function adjustDays() {
-      const y = parseInt(ySel.value), m = parseInt(mSel.value);
-      if(!y || !m) return;
-      const daysInMonth = new Date(y, m, 0).getDate();
-      const currentDay = parseInt(dSel.value);
-      let dHtml = `<option value="">--</option>`;
-      for(let d = 1; d <= daysInMonth; d++) dHtml += `<option value="${d}" ${d === currentDay ? 'selected' : ''}>${d}</option>`;
-      dSel.innerHTML = dHtml;
-      document.getElementById(containerId).classList.remove('has-error');
-    }
-    ySel.addEventListener('change', adjustDays);
-    mSel.addEventListener('change', adjustDays);
-    dSel.addEventListener('change', () => document.getElementById(containerId).classList.remove('has-error'));
-  }
-
-  function getPickerDate(containerId) {
-    const y = document.getElementById(`${containerId}-y`)?.value;
-    const m = document.getElementById(`${containerId}-m`)?.value;
-    const d = document.getElementById(`${containerId}-d`)?.value;
-    if(!y || !m || !d) return null;
-    return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-  }
-
-  // ★ 寿命用カスタムステッパー生成
-  function initLifeStepper() {
-    const wrap = document.getElementById('input-life-wrap');
-    if(!wrap) return;
-    
-    wrap.innerHTML = `
-      <div class="stepper-wrapper" id="life-stepper-container">
-        <input type="number" id="input-life" class="stepper-input" value="${config.lifeAge || 30}" min="1" max="150" readonly>
-        <span class="stepper-suffix">歳まで</span>
-        <button type="button" class="stepper-btn" id="btn-life-minus">－</button>
-        <button type="button" class="stepper-btn" id="btn-life-plus">＋</button>
-      </div>
-    `;
-
-    const inputLife = document.getElementById('input-life');
-    document.getElementById('btn-life-minus').addEventListener('click', () => {
-      let val = parseInt(inputLife.value) || 30;
-      if(val > 1) inputLife.value = val - 1;
-    });
-    document.getElementById('btn-life-plus').addEventListener('click', () => {
-      let val = parseInt(inputLife.value) || 30;
-      if(val < 150) inputLife.value = val + 1;
-    });
-  }
-
-  function populateSettings() {
-    initDatePicker('picker-birth', config.birth);
-    initLifeStepper();
-    renderCustomSettings();
-  }
-
-  function renderCustomSettings() {
-    const list = document.getElementById('custom-settings-list');
-    if(!list) return;
-    list.innerHTML = '';
-    const customs = config.customs || [];
-    customs.forEach((c, index) => {
-      const pId = `picker-custom-${index}`;
-      const card = document.createElement('div');
-      card.className = 'custom-item-card';
-      card.innerHTML = `
-        <div class="custom-item-header">
-          <input type="text" class="input-field" placeholder="タイトル (例: 禁煙)" value="${c.title}" id="custom-title-${index}" style="margin-right: 12px;">
-          <button class="btn-icon-danger" onclick="removeCustom(${index})" title="削除">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-          </button>
-        </div>
-        <div class="date-picker-group" id="${pId}"></div>
-        <div class="error-msg" id="error-custom-${index}">未来の日付は選択できません</div>
-      `;
-      list.appendChild(card);
-      initDatePicker(pId, c.start);
-    });
-    const addBtn = document.getElementById('btn-add-custom');
-    if(addBtn) addBtn.style.display = customs.length >= 3 ? 'none' : 'block';
-  }
-
-  const btnAddCustom = document.getElementById('btn-add-custom');
-  if(btnAddCustom) {
-    btnAddCustom.addEventListener('click', () => {
-      if(!config.customs) config.customs = [];
-      if(config.customs.length < 3) {
-        config.customs.push({ title: '', start: null });
-        renderCustomSettings();
-      }
-    });
-  }
-
-  window.removeCustom = function(index) {
-    config.customs.splice(index, 1);
-    renderCustomSettings();
-  };
-
-  function isFutureDate(dateStr) {
-    if(!dateStr) return false;
-    const selected = new Date(dateStr);
-    const now = new Date(); now.setHours(23, 59, 59, 999);
-    return selected > now;
-  }
-
-  // --- 保存処理とトランジション ---
-  if (btnStartSetup) {
-    btnStartSetup.addEventListener('click', () => {
-      setupOverlay.style.opacity = '0';
-      setTimeout(() => {
-        setupOverlay.style.display = 'none';
-        startMainUI();
-        const targetIndex = flow.findIndex(f => f.tab === 'view-settings');
-        if(targetIndex !== -1) {
-          currentIndex = targetIndex;
-          updateCarousel();
-        }
-      }, 300);
-    });
-  }
-
-  const btnSaveSettings = document.getElementById('btn-save-settings');
-  if (btnSaveSettings) {
-    btnSaveSettings.addEventListener('click', () => {
-      let hasError = false;
-      const birthStr = getPickerDate('picker-birth');
-      if(birthStr && isFutureDate(birthStr)) {
-        document.getElementById('picker-birth').classList.add('has-error');
-        hasError = true;
-      }
-      if(!birthStr) { alert('生まれた日付を選択してください。'); return; }
-
-      const inputLife = document.getElementById('input-life');
-      const lifeAge = inputLife ? inputLife.value : 30;
-
-      const newCustoms = [];
-      const customsCount = config.customs?.length || 0;
-      for(let i=0; i<customsCount; i++) {
-        const tInput = document.getElementById(`custom-title-${i}`);
-        const tVal = tInput ? tInput.value : '';
-        const cStr = getPickerDate(`picker-custom-${i}`);
-        
-        if(cStr && isFutureDate(cStr)) {
-          document.getElementById(`picker-custom-${i}`).classList.add('has-error');
-          hasError = true;
-        } else if (cStr) {
-          newCustoms.push({ title: tVal, start: cStr });
-        }
-      }
-
-      if (hasError) return; 
-
-      // データを確定
-      config = { birth: birthStr, lifeAge: lifeAge, customs: newCustoms };
-      localStorage.setItem('lifeTrackerConfig', JSON.stringify(config));
-      
-      // 保存中アニメーションの実行
-      const overlay = document.getElementById('saving-overlay');
-      const spinner = document.getElementById('saving-spinner');
-      const check = document.getElementById('saving-check');
-      const text = document.getElementById('saving-text');
-      
-      overlay.classList.add('active');
-      spinner.style.display = 'block';
-      check.style.display = 'none';
-      text.textContent = 'Saving...';
-
-      // 1秒後に保存完了表示
-      setTimeout(() => {
-        spinner.style.display = 'none';
-        check.style.display = 'flex';
-        text.textContent = 'Saved!';
-        
-        // さらに0.8秒後に消して、Custom画面へ遷移
-        setTimeout(() => {
-          overlay.classList.remove('active');
-          
-          buildDOMFlow();
-          
-          // ★修正：強制的にLifeに戻すのではなく、Customタブへ移動
-          const targetIndex = flow.findIndex(f => f.tab === 'view-custom');
-          currentIndex = targetIndex !== -1 ? targetIndex : 0; 
-          
-          updateCarousel();
-          startRenderLoop();
-        }, 800);
-      }, 1000);
-    });
-  }
-
-  init();
-});
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes popIn { 0% { transform: scale(0.5); opacity: 0; } 80% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
