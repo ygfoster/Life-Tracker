@@ -12,11 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const setupOverlay = document.getElementById('setup-overlay');
   const btnStartSetup = document.getElementById('btn-start-setup');
 
-  const colors = {
-    life: ['#FF453A', '#FF9F0A'],
-    born: ['#30D158', '#34C759'],
-    custom: ['#BF5AF2', '#FF375F']
-  };
+  const colors = { life: ['#FF453A', '#FF9F0A'], born: ['#30D158', '#34C759'], custom: ['#BF5AF2', '#FF375F'] };
 
   function init() {
     injectSVGDefs();
@@ -150,12 +146,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const mainContent = document.getElementById('main-content');
   if(mainContent) {
     mainContent.addEventListener('touchstart', e => {
-      if (e.target.closest('select') || e.target.closest('input') || e.target.closest('button')) return;
+      // スワイプ削除中やピッカー内は画面スワイプ無効
+      if (e.target.closest('input') || e.target.closest('button') || e.target.closest('.custom-date-picker-wrap') || e.target.closest('.swipe-content')) return;
       touchStartX = e.changedTouches[0].screenX;
       touchStartY = e.changedTouches[0].screenY;
     }, {passive: true});
     mainContent.addEventListener('touchend', e => {
-      if (e.target.closest('select') || e.target.closest('input') || e.target.closest('button')) return;
+      if (e.target.closest('input') || e.target.closest('button') || e.target.closest('.custom-date-picker-wrap') || e.target.closest('.swipe-content')) return;
       let dx = e.changedTouches[0].screenX - touchStartX;
       let dy = e.changedTouches[0].screenY - touchStartY;
       if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
@@ -246,38 +243,113 @@ document.addEventListener('DOMContentLoaded', () => {
     circle.style.strokeDashoffset = data.years === '-' ? circumference : circumference - (data.progress * circumference);
   }
 
+  // ★システム感ゼロの完全自作ドロップダウン（OSダイアログ排除）
   function initDatePicker(containerId, initialDateStr) {
     const container = document.getElementById(containerId);
     if(!container) return;
+    
     let initY = '', initM = '', initD = '';
     if (initialDateStr) {
       const d = new Date(initialDateStr);
       if(!isNaN(d.getTime())){ initY = d.getFullYear(); initM = d.getMonth() + 1; initD = d.getDate(); }
     }
     const currentYear = new Date().getFullYear();
-    let html = `<div class="apple-select-wrap"><select class="apple-select" id="${containerId}-y"><option value="">--</option>`;
-    for(let y = currentYear; y >= currentYear - 100; y--) html += `<option value="${y}" ${y === initY ? 'selected' : ''}>${y}</option>`;
-    html += `</select><span class="unit-label">年</span></div><div class="apple-select-wrap"><select class="apple-select" id="${containerId}-m"><option value="">--</option>`;
-    for(let m = 1; m <= 12; m++) html += `<option value="${m}" ${m === initM ? 'selected' : ''}>${m}</option>`;
-    html += `</select><span class="unit-label">月</span></div><div class="apple-select-wrap"><select class="apple-select" id="${containerId}-d"><option value="">--</option>`;
-    for(let d = 1; d <= 31; d++) html += `<option value="${d}" ${d === initD ? 'selected' : ''}>${d}</option>`;
-    html += `</select><span class="unit-label">日</span></div>`;
-    container.innerHTML = html;
 
-    const ySel = document.getElementById(`${containerId}-y`); const mSel = document.getElementById(`${containerId}-m`); const dSel = document.getElementById(`${containerId}-d`);
-    function adjustDays() {
-      const y = parseInt(ySel.value), m = parseInt(mSel.value);
-      if(!y || !m) return;
-      const daysInMonth = new Date(y, m, 0).getDate();
-      const currentDay = parseInt(dSel.value);
-      let dHtml = `<option value="">--</option>`;
-      for(let d = 1; d <= daysInMonth; d++) dHtml += `<option value="${d}" ${d === currentDay ? 'selected' : ''}>${d}</option>`;
-      dSel.innerHTML = dHtml;
-      document.getElementById(containerId).classList.remove('has-error');
+    function createDropdown(type, min, max, initVal, unit) {
+      let optionsHtml = `<div class="custom-date-option ${!initVal ? 'selected' : ''}" data-value="">--</div>`;
+      if(type === 'y') {
+        for(let y = max; y >= min; y--) optionsHtml += `<div class="custom-date-option ${y === parseInt(initVal) ? 'selected' : ''}" data-value="${y}">${y}</div>`;
+      } else {
+        for(let i = min; i <= max; i++) optionsHtml += `<div class="custom-date-option ${i === parseInt(initVal) ? 'selected' : ''}" data-value="${i}">${i}</div>`;
+      }
+      return `
+        <div class="custom-date-picker-wrap" id="${containerId}-${type}-wrap">
+          <div class="custom-date-display" id="${containerId}-${type}-display">${initVal || '--'}</div>
+          <span class="custom-date-unit">${unit}</span>
+          <div class="custom-date-options" id="${containerId}-${type}-options">${optionsHtml}</div>
+          <input type="hidden" id="${containerId}-${type}" value="${initVal || ''}">
+        </div>
+      `;
     }
-    ySel.addEventListener('change', adjustDays); mSel.addEventListener('change', adjustDays);
-    dSel.addEventListener('change', () => document.getElementById(containerId).classList.remove('has-error'));
+
+    container.innerHTML = `
+      ${createDropdown('y', currentYear - 100, currentYear, initY, '年')}
+      ${createDropdown('m', 1, 12, initM, '月')}
+      ${createDropdown('d', 1, 31, initD, '日')}
+    `;
+
+    ['y', 'm', 'd'].forEach(type => {
+      const wrap = document.getElementById(`${containerId}-${type}-wrap`);
+      const display = document.getElementById(`${containerId}-${type}-display`);
+      const optionsBox = document.getElementById(`${containerId}-${type}-options`);
+      const hiddenInput = document.getElementById(`${containerId}-${type}`);
+
+      display.addEventListener('click', (e) => {
+        e.stopPropagation();
+        document.querySelectorAll('.custom-date-options.show').forEach(el => {
+          if(el !== optionsBox) {
+            el.classList.remove('show');
+            el.previousElementSibling.previousElementSibling.classList.remove('active');
+            el.parentElement.style.zIndex = '1';
+          }
+        });
+        const isOpen = optionsBox.classList.contains('show');
+        if(isOpen) {
+          optionsBox.classList.remove('show');
+          display.classList.remove('active');
+          wrap.style.zIndex = '1';
+        } else {
+          optionsBox.classList.add('show');
+          display.classList.add('active');
+          wrap.style.zIndex = '100'; // 上に被せる
+          const selected = optionsBox.querySelector('.selected');
+          if(selected) optionsBox.scrollTop = selected.offsetTop - optionsBox.clientHeight / 2;
+        }
+      });
+
+      optionsBox.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if(e.target.classList.contains('custom-date-option')) {
+          const val = e.target.getAttribute('data-value');
+          display.textContent = val || '--';
+          hiddenInput.value = val;
+          optionsBox.querySelectorAll('.custom-date-option').forEach(opt => opt.classList.remove('selected'));
+          e.target.classList.add('selected');
+          optionsBox.classList.remove('show');
+          display.classList.remove('active');
+          wrap.style.zIndex = '1';
+          if(type === 'y' || type === 'm') adjustDays();
+          container.classList.remove('has-error');
+        }
+      });
+    });
+
+    function adjustDays() {
+      const yVal = document.getElementById(`${containerId}-y`).value;
+      const mVal = document.getElementById(`${containerId}-m`).value;
+      const dHidden = document.getElementById(`${containerId}-d`);
+      const dDisplay = document.getElementById(`${containerId}-d-display`);
+      const dOptions = document.getElementById(`${containerId}-d-options`);
+
+      if(!yVal || !mVal) return;
+      const daysInMonth = new Date(parseInt(yVal), parseInt(mVal), 0).getDate();
+      let currentDay = parseInt(dHidden.value);
+      if(currentDay > daysInMonth) { currentDay = ''; dHidden.value = ''; dDisplay.textContent = '--'; }
+
+      let optionsHtml = `<div class="custom-date-option ${!currentDay ? 'selected' : ''}" data-value="">--</div>`;
+      for(let d = 1; d <= daysInMonth; d++) optionsHtml += `<div class="custom-date-option ${d === currentDay ? 'selected' : ''}" data-value="${d}">${d}</div>`;
+      dOptions.innerHTML = optionsHtml;
+    }
   }
+
+  // 画面外クリックでドロップダウンを閉じる
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.custom-date-options.show').forEach(el => {
+      el.classList.remove('show');
+      el.previousElementSibling.previousElementSibling.classList.remove('active');
+      el.parentElement.style.zIndex = '1';
+    });
+  });
 
   function getPickerDate(containerId) {
     const y = document.getElementById(`${containerId}-y`)?.value;
@@ -297,12 +369,8 @@ document.addEventListener('DOMContentLoaded', () => {
           <span class="suffix">歳まで</span>
         </div>
         <div class="stepper-controls">
-          <button type="button" class="stepper-btn" id="btn-life-minus">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="5" y1="12" x2="19" y2="12" stroke-width="2" stroke-linecap="round"/></svg>
-          </button>
-          <button type="button" class="stepper-btn" id="btn-life-plus">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19" stroke-width="2" stroke-linecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke-width="2" stroke-linecap="round"/></svg>
-          </button>
+          <button type="button" class="stepper-btn" id="btn-life-minus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="5" y1="12" x2="19" y2="12" stroke-width="2" stroke-linecap="round"/></svg></button>
+          <button type="button" class="stepper-btn" id="btn-life-plus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19" stroke-width="2" stroke-linecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke-width="2" stroke-linecap="round"/></svg></button>
         </div>
       </div>
     `;
@@ -323,7 +391,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderCustomSettings();
   }
 
-  // ★ 修正：入力欄にラベル「タイトル」「開始した日付を設定」を追加
+  // ★Swipe-to-delete を搭載したカスタム設定リスト
   function renderCustomSettings() {
     const list = document.getElementById('custom-settings-list');
     if(!list) return;
@@ -331,27 +399,65 @@ document.addEventListener('DOMContentLoaded', () => {
     const customs = config.customs || [];
     customs.forEach((c, index) => {
       const pId = `picker-custom-${index}`;
-      const card = document.createElement('div');
-      card.className = 'custom-item-card';
-      card.innerHTML = `
-        <div class="custom-item-header" style="align-items: flex-end; margin-bottom: 20px;">
-          <div style="flex: 1; margin-right: 16px;">
-            <label class="custom-input-label">タイトル</label>
-            <input type="text" class="input-field" placeholder="例: 禁煙" value="${c.title}" id="custom-title-${index}" style="width: 100%;">
-          </div>
-          <button class="btn-icon-danger" onclick="removeCustom(${index})" title="削除" style="margin-bottom: 6px;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+      const container = document.createElement('div');
+      container.className = 'swipe-item-container';
+      
+      container.innerHTML = `
+        <div class="swipe-actions-bg">
+          <button class="swipe-delete-btn" onclick="removeCustom(${index})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+            削除
           </button>
         </div>
-        <div>
-          <label class="custom-input-label">開始した日付を設定</label>
-          <div class="date-picker-group" id="${pId}"></div>
+        <div class="swipe-content" id="swipe-content-${index}">
+          <div class="custom-item-header" style="margin-bottom: 20px;">
+            <div style="flex: 1;">
+              <label class="custom-input-label">タイトル</label>
+              <input type="text" class="input-field" placeholder="例: 禁煙" value="${c.title}" id="custom-title-${index}" style="width: 100%;">
+            </div>
+          </div>
+          <div>
+            <label class="custom-input-label">開始した日付を設定</label>
+            <div class="date-picker-group" id="${pId}"></div>
+          </div>
+          <div class="error-msg" id="error-custom-${index}">未来の日付は選択できません</div>
         </div>
-        <div class="error-msg" id="error-custom-${index}">未来の日付は選択できません</div>
       `;
-      list.appendChild(card);
+      list.appendChild(container);
       initDatePicker(pId, c.start);
+
+      // スワイプロジック
+      const swipeContent = container.querySelector('.swipe-content');
+      let startX = 0, currentX = 0, isDragging = false;
+      
+      swipeContent.addEventListener('touchstart', (e) => {
+        // ピッカーや入力欄操作中はスワイプ無効
+        if(e.target.closest('input') || e.target.closest('.custom-date-picker-wrap')) return;
+        startX = e.touches[0].clientX;
+        isDragging = true;
+        swipeContent.style.transition = 'none';
+      }, {passive: true});
+
+      swipeContent.addEventListener('touchmove', (e) => {
+        if(!isDragging) return;
+        currentX = e.touches[0].clientX - startX;
+        if(currentX > 0) currentX = 0; // 右には動かさない
+        if(currentX < -100) currentX = -100; // 左への限界値
+        swipeContent.style.transform = `translateX(${currentX}px)`;
+      }, {passive: true});
+
+      swipeContent.addEventListener('touchend', () => {
+        if(!isDragging) return;
+        isDragging = false;
+        swipeContent.style.transition = 'transform 0.3s cubic-bezier(0.2, 0.9, 0.2, 1)';
+        if(currentX < -50) {
+          swipeContent.style.transform = `translateX(-80px)`; // 開いた状態で固定
+        } else {
+          swipeContent.style.transform = `translateX(0)`; // 元に戻す
+        }
+      }, {passive: true});
     });
+    
     const addBtn = document.getElementById('btn-add-custom');
     if(addBtn) addBtn.style.display = customs.length >= 3 ? 'none' : 'block';
   }
