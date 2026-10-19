@@ -164,7 +164,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if(mainContent) {
     mainContent.addEventListener('touchstart', e => {
-      // ★ ピッカーのリストが開いている時だけ画面遷移スワイプを無効化
       if (e.target.closest('.swipe-content') || e.target.closest('button') || e.target.closest('.custom-date-options')) return;
       touchStartX = e.changedTouches[0].screenX;
       touchStartY = e.changedTouches[0].screenY;
@@ -446,7 +445,6 @@ document.addEventListener('DOMContentLoaded', () => {
       let startX = 0, currentX = 0;
       
       swipeContent.addEventListener('touchstart', (e) => {
-        // ★ ドロップダウンのリスト内操作中のみスワイプを無効化（ピッカー上からはスワイプ可能）
         if(e.target.closest('.custom-date-options')) return;
         
         document.querySelectorAll('.swipe-content').forEach(el => {
@@ -460,7 +458,6 @@ document.addEventListener('DOMContentLoaded', () => {
       swipeContent.addEventListener('touchmove', (e) => {
         if(document.activeElement === container.querySelector(`#custom-title-${index}`)) return;
         if(e.target.closest('.custom-date-options')) return;
-        
         currentX = e.touches[0].clientX - startX;
       }, {passive: true});
 
@@ -468,7 +465,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if(document.activeElement === container.querySelector(`#custom-title-${index}`)) return;
         if(currentX === 0) return; 
 
-        // ★ 追従アニメーションを廃止し、一瞬で開閉するトリガー式アニメーションに変更
         if(currentX < -25) {
           swipeContent.style.transform = `translateX(-80px)`;
         } else if (currentX > 25) {
@@ -489,16 +485,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // ★ 究極の「物理的消滅アニメーション（iOSライク）」
+  // ★ 完璧なタイミングで制御された「物理的消滅アニメーション」
   window.removeCustom = function(index) {
     const itemContainer = document.getElementById(`swipe-item-${index}`);
     if (itemContainer) {
-      // 1. 左へ一気にスライドアウトしながら透明になる
-      itemContainer.style.transition = 'opacity 0.25s ease, transform 0.25s cubic-bezier(0.2, 0.9, 0.2, 1)';
+      // 1. スワイプ展開時と全く同じ「0.3秒」かつ「同じカーブ」で左へスライドアウトさせる
+      itemContainer.style.transition = 'opacity 0.3s cubic-bezier(0.2, 0.9, 0.2, 1), transform 0.3s cubic-bezier(0.2, 0.9, 0.2, 1)';
       itemContainer.style.opacity = '0';
-      itemContainer.style.transform = 'scale(0.95) translateX(-100%)';
+      itemContainer.style.transform = 'translateX(-100%)';
       
-      // 2. 少し遅れて、空いた空間が滑らかにシュッと閉じる
+      // 2. スライドアウトが完全に終了した直後（300ms後）に、高さを詰めるアニメーションを開始
       setTimeout(() => {
         const h = itemContainer.offsetHeight;
         itemContainer.style.transition = 'none';
@@ -506,18 +502,19 @@ document.addEventListener('DOMContentLoaded', () => {
         itemContainer.style.overflow = 'hidden';
         
         requestAnimationFrame(() => {
-          itemContainer.style.transition = 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1), margin-bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+          // 高さを詰める際も、他の動作と完全に同じ速度・カーブを使用する
+          itemContainer.style.transition = 'height 0.3s cubic-bezier(0.2, 0.9, 0.2, 1), margin-bottom 0.3s cubic-bezier(0.2, 0.9, 0.2, 1), padding 0.3s cubic-bezier(0.2, 0.9, 0.2, 1)';
           itemContainer.style.height = '0px';
           itemContainer.style.marginBottom = '0px';
           itemContainer.style.paddingTop = '0px';
           itemContainer.style.paddingBottom = '0px';
         });
-      }, 200);
+      }, 300);
 
-      // 3. アニメーション完了後にDOMから削除
+      // 3. すべてのアニメーションが完了した後（300ms + 300ms = 600ms後）にDOMから削除
       setTimeout(() => {
         executeRemoveCustom(index);
-      }, 500);
+      }, 600);
     } else {
       executeRemoveCustom(index);
     }
