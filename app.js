@@ -287,7 +287,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
   }
 
-  // ★分離された美しいステッパー
   function initLifeStepper() {
     const wrap = document.getElementById('input-life-wrap');
     if(!wrap) return;
@@ -324,6 +323,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderCustomSettings();
   }
 
+  // ★ 修正：入力欄にラベル「タイトル」「開始した日付を設定」を追加
   function renderCustomSettings() {
     const list = document.getElementById('custom-settings-list');
     if(!list) return;
@@ -334,13 +334,19 @@ document.addEventListener('DOMContentLoaded', () => {
       const card = document.createElement('div');
       card.className = 'custom-item-card';
       card.innerHTML = `
-        <div class="custom-item-header">
-          <input type="text" class="input-field" placeholder="タイトル (例: 禁煙)" value="${c.title}" id="custom-title-${index}" style="margin-right: 12px;">
-          <button class="btn-icon-danger" onclick="removeCustom(${index})" title="削除">
+        <div class="custom-item-header" style="align-items: flex-end; margin-bottom: 20px;">
+          <div style="flex: 1; margin-right: 16px;">
+            <label class="custom-input-label">タイトル</label>
+            <input type="text" class="input-field" placeholder="例: 禁煙" value="${c.title}" id="custom-title-${index}" style="width: 100%;">
+          </div>
+          <button class="btn-icon-danger" onclick="removeCustom(${index})" title="削除" style="margin-bottom: 6px;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
           </button>
         </div>
-        <div class="date-picker-group" id="${pId}"></div>
+        <div>
+          <label class="custom-input-label">開始した日付を設定</label>
+          <div class="date-picker-group" id="${pId}"></div>
+        </div>
         <div class="error-msg" id="error-custom-${index}">未来の日付は選択できません</div>
       `;
       list.appendChild(card);
@@ -357,7 +363,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // ★ 削除時のオートセーブ（タスクキル対策）
   window.removeCustom = function(index) {
     const customsCount = config.customs?.length || 0;
     for(let i=0; i<customsCount; i++) {
