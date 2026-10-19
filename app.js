@@ -12,7 +12,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const setupOverlay = document.getElementById('setup-overlay');
   const btnStartSetup = document.getElementById('btn-start-setup');
 
-  const colors = { life: ['#FF453A', '#FF9F0A'], born: ['#30D158', '#34C759'], custom: ['#BF5AF2', '#FF375F'] };
+  const colors = {
+    life: ['#FF453A', '#FF9F0A'],
+    born: ['#30D158', '#34C759'],
+    custom: ['#BF5AF2', '#FF375F']
+  };
 
   function init() {
     injectSVGDefs();
@@ -111,6 +115,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function updateCarousel() {
     if(flow.length === 0 || !swipeWrapper) return;
+    
+    // ★ 画面遷移時にスワイプ削除をすべて強制リセット（レイヤー出っぱなし防止）
+    document.querySelectorAll('.swipe-content').forEach(el => {
+      el.style.transform = 'translateX(0)';
+    });
+
     if(currentIndex < 0) currentIndex = 0;
     if(currentIndex >= flow.length) currentIndex = flow.length - 1;
     swipeWrapper.style.transform = `translateX(-${currentIndex * 100}vw)`;
@@ -144,9 +154,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let touchStartX = 0, touchStartY = 0;
   const mainContent = document.getElementById('main-content');
+
+  // ★ 余白タッチでもスワイプ削除を閉じる処理
+  document.addEventListener('touchstart', (e) => {
+    if (!e.target.closest('.swipe-item-container')) {
+      document.querySelectorAll('.swipe-content').forEach(el => {
+        el.style.transform = 'translateX(0)';
+      });
+    }
+  }, {passive: true});
+
   if(mainContent) {
     mainContent.addEventListener('touchstart', e => {
-      // スワイプ削除中やピッカー内は画面スワイプ無効
       if (e.target.closest('input') || e.target.closest('button') || e.target.closest('.custom-date-picker-wrap') || e.target.closest('.swipe-content')) return;
       touchStartX = e.changedTouches[0].screenX;
       touchStartY = e.changedTouches[0].screenY;
@@ -243,7 +262,6 @@ document.addEventListener('DOMContentLoaded', () => {
     circle.style.strokeDashoffset = data.years === '-' ? circumference : circumference - (data.progress * circumference);
   }
 
-  // ★システム感ゼロの完全自作ドロップダウン（OSダイアログ排除）
   function initDatePicker(containerId, initialDateStr) {
     const container = document.getElementById(containerId);
     if(!container) return;
@@ -301,7 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
           optionsBox.classList.add('show');
           display.classList.add('active');
-          wrap.style.zIndex = '100'; // 上に被せる
+          wrap.style.zIndex = '100'; 
           const selected = optionsBox.querySelector('.selected');
           if(selected) optionsBox.scrollTop = selected.offsetTop - optionsBox.clientHeight / 2;
         }
@@ -342,7 +360,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // 画面外クリックでドロップダウンを閉じる
   document.addEventListener('click', () => {
     document.querySelectorAll('.custom-date-options.show').forEach(el => {
       el.classList.remove('show');
@@ -391,7 +408,6 @@ document.addEventListener('DOMContentLoaded', () => {
     renderCustomSettings();
   }
 
-  // ★Swipe-to-delete を搭載したカスタム設定リスト
   function renderCustomSettings() {
     const list = document.getElementById('custom-settings-list');
     if(!list) return;
@@ -401,6 +417,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const pId = `picker-custom-${index}`;
       const container = document.createElement('div');
       container.className = 'swipe-item-container';
+      container.id = `swipe-item-${index}`; // ★ 削除アニメーション用のID
       
       container.innerHTML = `
         <div class="swipe-actions-bg">
@@ -426,13 +443,17 @@ document.addEventListener('DOMContentLoaded', () => {
       list.appendChild(container);
       initDatePicker(pId, c.start);
 
-      // スワイプロジック
       const swipeContent = container.querySelector('.swipe-content');
       let startX = 0, currentX = 0, isDragging = false;
       
       swipeContent.addEventListener('touchstart', (e) => {
-        // ピッカーや入力欄操作中はスワイプ無効
         if(e.target.closest('input') || e.target.closest('.custom-date-picker-wrap')) return;
+        
+        // ★ スワイプ開始時に、他の開いているスワイプ項目をすべて閉じる
+        document.querySelectorAll('.swipe-content').forEach(el => {
+          if (el !== swipeContent) el.style.transform = 'translateX(0)';
+        });
+        
         startX = e.touches[0].clientX;
         isDragging = true;
         swipeContent.style.transition = 'none';
@@ -441,8 +462,8 @@ document.addEventListener('DOMContentLoaded', () => {
       swipeContent.addEventListener('touchmove', (e) => {
         if(!isDragging) return;
         currentX = e.touches[0].clientX - startX;
-        if(currentX > 0) currentX = 0; // 右には動かさない
-        if(currentX < -100) currentX = -100; // 左への限界値
+        if(currentX > 0) currentX = 0; 
+        if(currentX < -100) currentX = -100; 
         swipeContent.style.transform = `translateX(${currentX}px)`;
       }, {passive: true});
 
@@ -450,10 +471,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if(!isDragging) return;
         isDragging = false;
         swipeContent.style.transition = 'transform 0.3s cubic-bezier(0.2, 0.9, 0.2, 1)';
-        if(currentX < -50) {
-          swipeContent.style.transform = `translateX(-80px)`; // 開いた状態で固定
+        
+        // ★ 閾値を -50 から -25 へ大幅に引き下げ（軽いフリックでサッと開くように調整）
+        if(currentX < -25) {
+          swipeContent.style.transform = `translateX(-80px)`;
         } else {
-          swipeContent.style.transform = `translateX(0)`; // 元に戻す
+          swipeContent.style.transform = `translateX(0)`; 
         }
       }, {passive: true});
     });
@@ -469,7 +492,36 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // ★ 削除時の「物理的消滅」UI/UXアニメーション
   window.removeCustom = function(index) {
+    const itemContainer = document.getElementById(`swipe-item-${index}`);
+    if (itemContainer) {
+      // 1. スムーズに奥へ縮みながら透明になるアニメーション
+      itemContainer.style.transition = 'all 0.35s cubic-bezier(0.2, 0.9, 0.2, 1)';
+      itemContainer.style.transform = 'scale(0.95) translateX(-20px)';
+      itemContainer.style.opacity = '0';
+      
+      // 2. 次のフレームで高さを削り、下の要素をシュッと引き上げる
+      requestAnimationFrame(() => {
+        itemContainer.style.maxHeight = itemContainer.offsetHeight + 'px';
+        requestAnimationFrame(() => {
+          itemContainer.style.maxHeight = '0px';
+          itemContainer.style.margin = '0px';
+          itemContainer.style.overflow = 'hidden';
+        });
+      });
+
+      // 3. アニメーション完了後に実際のデータを削除
+      setTimeout(() => {
+        executeRemoveCustom(index);
+      }, 350);
+    } else {
+      executeRemoveCustom(index);
+    }
+  };
+
+  // 実際のデータ削除処理を分離
+  function executeRemoveCustom(index) {
     const customsCount = config.customs?.length || 0;
     for(let i=0; i<customsCount; i++) {
       const tInput = document.getElementById(`custom-title-${i}`);
@@ -480,7 +532,7 @@ document.addEventListener('DOMContentLoaded', () => {
     config.customs.splice(index, 1);
     localStorage.setItem('lifeTrackerConfig', JSON.stringify(config));
     renderCustomSettings();
-  };
+  }
 
   function isFutureDate(dateStr) {
     if(!dateStr) return false;
