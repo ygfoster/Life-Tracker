@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateCarousel() {
     if(flow.length === 0 || !swipeWrapper) return;
     
-    // ★ 画面遷移時にスワイプ削除をすべて強制リセット（レイヤー出っぱなし防止）
+    // 画面遷移時にスワイプ削除をすべて強制リセット
     document.querySelectorAll('.swipe-content').forEach(el => {
       el.style.transform = 'translateX(0)';
     });
@@ -155,7 +155,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let touchStartX = 0, touchStartY = 0;
   const mainContent = document.getElementById('main-content');
 
-  // ★ 余白タッチでもスワイプ削除を閉じる処理
+  // 余白タッチでもスワイプ削除を閉じる処理
   document.addEventListener('touchstart', (e) => {
     if (!e.target.closest('.swipe-item-container')) {
       document.querySelectorAll('.swipe-content').forEach(el => {
@@ -164,14 +164,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }, {passive: true});
 
+  // 画面全体のスワイプ（タブ切り替え）判定
   if(mainContent) {
     mainContent.addEventListener('touchstart', e => {
-      if (e.target.closest('input') || e.target.closest('button') || e.target.closest('.custom-date-picker-wrap') || e.target.closest('.swipe-content')) return;
+      // Swipe-to-deleteのカード内やドロップダウン操作中は画面遷移をブロック
+      if (e.target.closest('.swipe-content') || e.target.closest('button') || e.target.closest('.custom-date-picker-wrap')) return;
       touchStartX = e.changedTouches[0].screenX;
       touchStartY = e.changedTouches[0].screenY;
     }, {passive: true});
     mainContent.addEventListener('touchend', e => {
-      if (e.target.closest('input') || e.target.closest('button') || e.target.closest('.custom-date-picker-wrap') || e.target.closest('.swipe-content')) return;
+      if (e.target.closest('.swipe-content') || e.target.closest('button') || e.target.closest('.custom-date-picker-wrap')) return;
       let dx = e.changedTouches[0].screenX - touchStartX;
       let dy = e.changedTouches[0].screenY - touchStartY;
       if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
@@ -417,7 +419,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const pId = `picker-custom-${index}`;
       const container = document.createElement('div');
       container.className = 'swipe-item-container';
-      container.id = `swipe-item-${index}`; // ★ 削除アニメーション用のID
+      container.id = `swipe-item-${index}`; 
       
       container.innerHTML = `
         <div class="swipe-actions-bg">
@@ -426,7 +428,7 @@ document.addEventListener('DOMContentLoaded', () => {
             削除
           </button>
         </div>
-        <div class="swipe-content" id="swipe-content-${index}">
+        <div class="swipe-content" id="swipe-content-${index}" style="transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.2, 1);">
           <div class="custom-item-header" style="margin-bottom: 20px;">
             <div style="flex: 1;">
               <label class="custom-input-label">タイトル</label>
@@ -443,41 +445,45 @@ document.addEventListener('DOMContentLoaded', () => {
       list.appendChild(container);
       initDatePicker(pId, c.start);
 
+      // ★ 根本から設計し直した、トリガー式スワイプアニメーション
       const swipeContent = container.querySelector('.swipe-content');
-      let startX = 0, currentX = 0, isDragging = false;
+      let startX = 0, currentX = 0;
       
       swipeContent.addEventListener('touchstart', (e) => {
-        if(e.target.closest('input') || e.target.closest('.custom-date-picker-wrap')) return;
+        // ドロップダウン操作中のみスワイプを無効化（input上でもスワイプ可能に修正）
+        if(e.target.closest('.custom-date-picker-wrap')) return;
         
-        // ★ スワイプ開始時に、他の開いているスワイプ項目をすべて閉じる
+        // 他の開いているスワイプ項目をすべて閉じる
         document.querySelectorAll('.swipe-content').forEach(el => {
           if (el !== swipeContent) el.style.transform = 'translateX(0)';
         });
         
+        // inputにフォーカスが当たっている場合はスワイプさせない（文字入力の邪魔をしないため）
+        if(document.activeElement === container.querySelector(`#custom-title-${index}`)) return;
+
         startX = e.touches[0].clientX;
-        isDragging = true;
-        swipeContent.style.transition = 'none';
       }, {passive: true});
 
       swipeContent.addEventListener('touchmove', (e) => {
-        if(!isDragging) return;
+        if(document.activeElement === container.querySelector(`#custom-title-${index}`)) return;
+        if(e.target.closest('.custom-date-picker-wrap')) return;
+        
         currentX = e.touches[0].clientX - startX;
-        if(currentX > 0) currentX = 0; 
-        if(currentX < -100) currentX = -100; 
-        swipeContent.style.transform = `translateX(${currentX}px)`;
       }, {passive: true});
 
       swipeContent.addEventListener('touchend', () => {
-        if(!isDragging) return;
-        isDragging = false;
-        swipeContent.style.transition = 'transform 0.3s cubic-bezier(0.2, 0.9, 0.2, 1)';
-        
-        // ★ 閾値を -50 から -25 へ大幅に引き下げ（軽いフリックでサッと開くように調整）
+        if(document.activeElement === container.querySelector(`#custom-title-${index}`)) return;
+        if(currentX === 0) return; // タップしただけの時は無視
+
+        // ★ 指の追従を廃止し、25px以上弾いた瞬間に「一瞬で開く/閉じる」トリガー式に変更
         if(currentX < -25) {
+          // 左へ軽くフリック → 一気に開く
           swipeContent.style.transform = `translateX(-80px)`;
-        } else {
+        } else if (currentX > 25) {
+          // 右へ軽くフリック → 一気に閉じる
           swipeContent.style.transform = `translateX(0)`; 
         }
+        currentX = 0; // 状態リセット
       }, {passive: true});
     });
     
@@ -492,16 +498,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // ★ 削除時の「物理的消滅」UI/UXアニメーション
   window.removeCustom = function(index) {
     const itemContainer = document.getElementById(`swipe-item-${index}`);
     if (itemContainer) {
-      // 1. スムーズに奥へ縮みながら透明になるアニメーション
       itemContainer.style.transition = 'all 0.35s cubic-bezier(0.2, 0.9, 0.2, 1)';
       itemContainer.style.transform = 'scale(0.95) translateX(-20px)';
       itemContainer.style.opacity = '0';
       
-      // 2. 次のフレームで高さを削り、下の要素をシュッと引き上げる
       requestAnimationFrame(() => {
         itemContainer.style.maxHeight = itemContainer.offsetHeight + 'px';
         requestAnimationFrame(() => {
@@ -511,7 +514,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       });
 
-      // 3. アニメーション完了後に実際のデータを削除
       setTimeout(() => {
         executeRemoveCustom(index);
       }, 350);
@@ -520,7 +522,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  // 実際のデータ削除処理を分離
   function executeRemoveCustom(index) {
     const customsCount = config.customs?.length || 0;
     for(let i=0; i<customsCount; i++) {
